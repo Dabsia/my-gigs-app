@@ -1,4 +1,6 @@
 import { queryClient } from "@/utils/react_query";
+import { ClerkProvider } from "@clerk/clerk-expo";
+import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { QueryClientProvider } from "@tanstack/react-query";
 import * as Font from "expo-font";
@@ -15,12 +17,13 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
   useEffect(() => {
     if (Platform.OS === "android") {
       // Set Android navigation bar color
-      // SystemUI.setBackgroundColorAsync("#061D3F"); // Your primary color
-      SystemUI.setBackgroundColorAsync("#000");
+      SystemUI.setBackgroundColorAsync("#061D3F"); // Your primary color
+      // SystemUI.setBackgroundColorAsync("#000");
     }
   }, []);
 
@@ -57,50 +60,51 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       {/* <SafeAreaView> */}
-      <QueryClientProvider client={queryClient}>
-        <BottomSheetModalProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-            }}
-          >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="onboarding/createprofile" />
-            <Stack.Screen name="onboarding/createpayout" />
-            <Stack.Screen name="onboarding/payoutsuccess" />
-            <Stack.Screen name="onboarding/complete" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="auth/login" />
-            <Stack.Screen name="new/gigname" />
-            <Stack.Screen name="new/summary" />
-            <Stack.Screen name="personalgigs/personal" />
-            <Stack.Screen name="groupgigs/group" />
-            <Stack.Screen name="giginfo/personalgiginfo" />
-            <Stack.Screen name="giginfo/board" />
-            <Stack.Screen name="giginfo/progress" />
-            <Stack.Screen name="giginfo/meetingscheduler" />
-            <Stack.Screen name="giginfo/addteam" />
-            <Stack.Screen name="giginfo/editgig" />
-            <Stack.Screen name="giginfo/editteam" />
-            <Stack.Screen name="giginfo/giginformation" />
-            <Stack.Screen name="userprofile/clients" />
-            <Stack.Screen name="userprofile/client/[id]" />
-            <Stack.Screen name="userprofile/client/new" />
-            <Stack.Screen name="userprofile/client/edit" />
-            <Stack.Screen name="userprofile/invoices" />
-            <Stack.Screen name="userprofile/invoice/new" />
-            <Stack.Screen name="userprofile/invoice/[id]" />
-            <Stack.Screen name="userprofile/drafts" />
-            <Stack.Screen name="userprofile/edit" />
-            <Stack.Screen name="userprofile/bank" />
-            <Stack.Screen name="userprofile/analytics" />
-            {/* <Stack.Screen name="userprofile/payment" /> */}
-            <Stack.Screen name="notification/notification" />
-            <Stack.Screen name="previewinvoice/preview" />
-          </Stack>
-        </BottomSheetModalProvider>
-      </QueryClientProvider>
-      {/* </SafeAreaView> */}
+      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+        <QueryClientProvider client={queryClient}>
+          <BottomSheetModalProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+              }}
+            >
+              <Stack.Screen name="index" />
+              <Stack.Screen name="onboarding/createprofile" />
+              <Stack.Screen name="onboarding/createpayout" />
+              <Stack.Screen name="onboarding/payoutsuccess" />
+              <Stack.Screen name="onboarding/complete" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="auth/login" />
+              <Stack.Screen name="new/gigname" />
+              <Stack.Screen name="new/summary" />
+              <Stack.Screen name="personalgigs/personal" />
+              <Stack.Screen name="groupgigs/group" />
+              <Stack.Screen name="giginfo/personalgiginfo" />
+              <Stack.Screen name="giginfo/board" />
+              <Stack.Screen name="giginfo/progress" />
+              <Stack.Screen name="giginfo/meetingscheduler" />
+              <Stack.Screen name="giginfo/addteam" />
+              <Stack.Screen name="giginfo/editgig" />
+              <Stack.Screen name="giginfo/editteam" />
+              <Stack.Screen name="giginfo/giginformation" />
+              <Stack.Screen name="userprofile/clients" />
+              <Stack.Screen name="userprofile/client/[id]" />
+              <Stack.Screen name="userprofile/client/new" />
+              <Stack.Screen name="userprofile/client/edit" />
+              <Stack.Screen name="userprofile/invoices" />
+              <Stack.Screen name="userprofile/invoice/new" />
+              <Stack.Screen name="userprofile/invoice/[id]" />
+              <Stack.Screen name="userprofile/drafts" />
+              <Stack.Screen name="userprofile/edit" />
+              <Stack.Screen name="userprofile/bank" />
+              <Stack.Screen name="userprofile/analytics" />
+              <Stack.Screen name="notification/notification" />
+              <Stack.Screen name="previewinvoice/preview" />
+            </Stack>
+          </BottomSheetModalProvider>
+        </QueryClientProvider>
+        {/* </SafeAreaView> */}
+      </ClerkProvider>
     </GestureHandlerRootView>
   );
 }

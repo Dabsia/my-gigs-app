@@ -1,34 +1,20 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  ScrollView,
-  Pressable,
-  Alert,
-} from "react-native";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 
-import {
-  ArrowLeft,
-  User,
-  Settings,
-  Users,
-  FileText,
-  CreditCard,
-  FileEdit,
-  LogOut,
-  Wallet,
-  ChevronRight,
-  ChartLine,
-} from "lucide-react-native";
-import { useRouter } from "expo-router";
 import Layout from "@/components/Layout/Layout";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { UserData } from "@/interfaces";
+import Logout from "@/components/Logout/Logout";
 import { getInitials } from "@/helpers/getInitials";
-import { authService } from "@/services/logout";
+import { UserData } from "@/interfaces";
 import { queryClient } from "@/utils/react_query";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import {
+  ChartLine,
+  ChevronRight,
+  FileText,
+  User,
+  Users,
+} from "lucide-react-native";
 // import { logout } from "@/hooks/logout";
 
 export default function profile() {
@@ -173,26 +159,8 @@ export default function profile() {
           onRoute={() => router.push("/userprofile/Invoices")}
           label="Invoices"
         />
-        {/* <MenuItem
-          icon={<CreditCard size={22} color="#000" />}
-          label="Payments"
-        /> */}
-        {/* <MenuItem
-          icon={<FileEdit size={22} color="#000" />}
-          onRoute={() => router.push("/userprofile/Drafts")}
-          label="Drafts"
-        /> */}
 
-        {/* Logout */}
-        <TouchableOpacity
-          onPress={handleLogout}
-          className="flex-row items-center mt-10 mb-16"
-        >
-          <LogOut size={22} color="#E23B3B" />
-          <Text className="text-red-500 text-lg font-semiBold ml-3">
-            Logout
-          </Text>
-        </TouchableOpacity>
+        <Logout />
       </ScrollView>
     </Layout>
   );
