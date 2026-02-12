@@ -1,38 +1,24 @@
-import {
-  View,
-  Text,
-  FlatList,
-  ActivityIndicator,
-  RefreshControl,
-  TouchableOpacity,
-} from "react-native";
-import React, { useState, useEffect } from "react";
-import GigCard from "../GigCard/GigCard";
-import { useQuery } from "@tanstack/react-query";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "@/utils/config";
+import { useAuth } from "@clerk/clerk-expo";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import React from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import GigCard from "../GigCard/GigCard";
 
 const LatestGigs = () => {
   const router = useRouter();
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [shouldFetch, setShouldFetch] = useState(false);
-
-  // Delay the initial fetch to avoid race conditions
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShouldFetch(true);
-      setIsInitialLoad(false);
-    }, 1000); // 1 second delay for initial load
-
-    return () => clearTimeout(timer);
-  }, []);
+  const { getToken, isLoaded, isSignedIn } = useAuth();
 
   const fetchProjects = async () => {
-    // Add a small delay before fetching
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    const authToken = await AsyncStorage.getItem("auth_token");
+    const authToken = await getToken();
     if (!authToken) {
       throw new Error("You are not logged in");
     }
@@ -46,37 +32,6 @@ const LatestGigs = () => {
       },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.message || `Server error: ${response.status}`;
-
-      // If 404, try plural endpoint as fallback
-      if (response.status === 404) {
-        try {
-          const altResponse = await fetch(`${API_BASE_URL}/api/projects`, {
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${authToken}`,
-            },
-          });
-
-          if (altResponse.ok) {
-            const altData = await altResponse.json();
-            if (altData.success) {
-              return altData;
-            }
-          }
-        } catch (altError) {
-          console.log("Alternative endpoint also failed");
-        }
-      }
-
-      throw new Error(errorMessage);
-    }
-
     const data = await response.json();
 
     if (!data.success) {
@@ -86,7 +41,7 @@ const LatestGigs = () => {
     return data;
   };
 
-  // Only fetch when shouldFetch is true
+  // Only fetch when Clerk is loaded AND user is signed in
   const {
     data: projectsData,
     isLoading,
@@ -95,10 +50,10 @@ const LatestGigs = () => {
     isRefetching,
     isError,
   } = useQuery({
-    queryKey: ["projects"],
+    queryKey: ["projects-latest"],
     queryFn: fetchProjects,
     staleTime: 5 * 60 * 1000,
-    enabled: shouldFetch, // CRITICAL: Only fetch when ready
+    enabled: isLoaded && isSignedIn, // CRITICAL: Only fetch when Clerk is ready AND user is authenticated
     retry: 2,
     retryDelay: 2000,
   });
@@ -108,8 +63,8 @@ const LatestGigs = () => {
   const limitedProjects = allProjects.slice(0, 5);
   const totalProjects = allProjects.length;
 
-  // Show initial loading state
-  if (isInitialLoad) {
+  // Show Clerk initialization state
+  if (!isLoaded) {
     return (
       <View className="mt-10 items-center justify-center py-8">
         <ActivityIndicator size="large" color="#007AFF" />
@@ -121,9 +76,14 @@ const LatestGigs = () => {
   // Show loading state
   if (isLoading) {
     return (
-      <View className="mt-10 items-center justify-center py-8">
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text className="mt-2 text-gray-600">Loading latest gigs...</Text>
+      <View className="mt-10">
+        <View className="flex-row justify-between items-center mb-4">
+          <Text className="font-semiBold text-[16px]">Latest Gigs</Text>
+        </View>
+        <View className="items-center justify-center py-8 bg-gray-50 rounded-lg">
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text className="mt-2 text-gray-600">Loading latest gigs...</Text>
+        </View>
       </View>
     );
   }

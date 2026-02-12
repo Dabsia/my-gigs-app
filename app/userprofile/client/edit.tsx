@@ -2,18 +2,18 @@
 import BackBtn from "@/components/BackBtn/BackBtn";
 import Layout from "@/components/Layout/Layout";
 import PrimaryBtn from "@/components/PrimaryBtn/PrimaryBtn";
-import React, { useState, useEffect } from "react";
+import { clientService } from "@/services/clientService";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
+  ActivityIndicator,
   Alert,
   ScrollView,
-  ActivityIndicator,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientService } from "@/services/clientService";
 
 export default function EditClient() {
   const router = useRouter();
@@ -34,13 +34,13 @@ export default function EditClient() {
 
   // Populate form with client data only once on mount
   useEffect(() => {
-    if (clientInfo) {
-      console.log("Client data received:", clientInfo);
-      setClientName(clientInfo.name || "");
-      setEmail(clientInfo.email || "");
-      setCompany(clientInfo.company || "");
-      setPhone(clientInfo.phone || "");
-      setAddress(clientInfo.address || "");
+    if (client) {
+      console.log("Client data received:", client);
+      setClientName(client.name || "");
+      setEmail(client.email || "");
+      setCompany(client.company || "");
+      setPhone(client.phone || "");
+      setAddress(client.address || "");
       setIsLoading(false);
     } else {
       // If no client data was passed, fetch it
@@ -58,7 +58,7 @@ export default function EditClient() {
   const updateClientMutation = useMutation({
     mutationFn: (updateData: any) =>
       clientService.updateClient(
-        clientInfo?._id || (clientId as string),
+        client?._id || (clientId as string),
         updateData
       ),
     onSuccess: (data) => {
@@ -69,7 +69,7 @@ export default function EditClient() {
 
         // Also invalidate the client profile page queries
         queryClient.invalidateQueries({
-          queryKey: ["client", clientInfo?._id],
+          queryKey: ["client", client?._id],
         });
 
         Alert.alert("Success", "Client updated successfully!", [
@@ -115,7 +115,7 @@ export default function EditClient() {
       company: company.trim() || undefined, // Send as undefined if empty
       phone: phone.trim() || undefined,
       address: address.trim() || undefined,
-      status: clientInfo?.status || "active", // Keep existing status
+      status: client?.status || "active", // Keep existing status
     };
 
     console.log("Updating client with data:", updateData);
@@ -142,7 +142,7 @@ export default function EditClient() {
   }
 
   // Client not found or no data
-  if (!clientInfo) {
+  if (!client) {
     return (
       <Layout>
         <View className="flex-1 justify-center items-center p-4">
@@ -174,7 +174,7 @@ export default function EditClient() {
             {/* Header */}
             <View className="mb-6 mt-6">
               <Text className="text-[18px] mt-3 font-semiBold text-center mb-8">
-                Edit {clientInfo?.name || "Client"}
+                Edit {client?.name || "Client"}
               </Text>
 
               {/* Client Name */}

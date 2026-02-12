@@ -4,14 +4,14 @@ import PrimaryBtn from "@/components/PrimaryBtn/PrimaryBtn";
 import { formatDate } from "@/helpers/formatDate";
 import { getInitials } from "@/helpers/getInitials";
 import { API_BASE_URL } from "@/utils/config";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "@clerk/clerk-expo";
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, Text, View } from "react-native";
 import { RefreshControl } from "react-native-gesture-handler";
 
-export default function GigInformation(): JSX.Element {
+export default function GigInformation() {
   const { gigInfo } = useLocalSearchParams();
   const router = useRouter();
 
@@ -23,6 +23,17 @@ export default function GigInformation(): JSX.Element {
 
   // Parse initial data from params if available
   const initialGig = gigInfo ? JSON.parse(gigInfo as string) : null;
+
+  const { getToken } = useAuth();
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      const token = await getToken();
+      setToken(token);
+    };
+    fetchToken();
+  }, [getToken]);
 
   const fetchProjectData = async (showLoading: boolean = true) => {
     try {
@@ -43,16 +54,6 @@ export default function GigInformation(): JSX.Element {
         return;
       }
 
-      const token = await AsyncStorage.getItem("auth_token");
-
-      if (!token) {
-        Alert.alert("Error", "You are not logged in. Please log in again.");
-        router.replace("/auth/login");
-        return;
-      }
-
-      console.log(`Fetching project with ID: ${idToFetch}`);
-
       const response = await fetch(`${API_BASE_URL}/api/project/${idToFetch}`, {
         method: "GET",
         headers: {
@@ -62,7 +63,6 @@ export default function GigInformation(): JSX.Element {
       });
 
       const data = await response.json();
-      console.log("Project fetch response:", data);
 
       if (response.ok && data.success) {
         setGig(data.data);
@@ -102,7 +102,6 @@ export default function GigInformation(): JSX.Element {
   // Refresh when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      console.log("Screen focused, refreshing project data...");
       fetchProjectData(false); // Don't show loading overlay on focus
     }, [])
   );
@@ -213,7 +212,7 @@ export default function GigInformation(): JSX.Element {
           </View>
 
           {/* Client */}
-          {gig?.clientInfo && (
+          {gig?.client && (
             <View className="mb-4 ">
               <Text className="text-lg font-semiBold text-gray-800 mb-3">
                 Client
@@ -221,21 +220,21 @@ export default function GigInformation(): JSX.Element {
               <View className="bg-white rounded-xl p-4 flex-row items-center gap-4 shadow-sm">
                 <View className="w-12 h-12 rounded-full bg-gray-800 items-center justify-center">
                   <Text className="text-white font-textBold text-lg">
-                    {getInitials(gig.clientInfo.name)}
+                    {getInitials(gig.client.name)}
                   </Text>
                 </View>
                 <View className="flex-1">
                   <Text className="text-sm font-semiBold text-gray-900">
-                    {gig.clientInfo.name}
+                    {gig.client.name}
                   </Text>
-                  {gig.clientInfo.company && (
+                  {gig.client.company && (
                     <Text className="text-sm font-regular text-gray-600">
-                      {gig.clientInfo.company}
+                      {gig.client.company}
                     </Text>
                   )}
-                  {gig.clientInfo.email && (
+                  {gig.client.email && (
                     <Text className="text-xs font-regular text-gray-500 mt-1">
-                      {gig.clientInfo.email}
+                      {gig.client.email}
                     </Text>
                   )}
                 </View>

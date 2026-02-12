@@ -24,13 +24,13 @@ const personalgiginfo = () => {
   const gig = gigInfo ? JSON.parse(gigInfo as string) : null;
   console.log(gig);
 
-  const teamMembers = [
-    { id: "1", name: "ME", role: "ME" },
-    { id: "2", name: "Bob Joel", role: "Designer" },
-    { id: "3", name: "Charlie", role: "Product Manager" },
-    { id: "4", name: "Bob Joel", role: "Designer" },
-    { id: "5", name: "Charlie", role: "Product Manager" },
-  ];
+  // const teamMembers = [
+  //   { id: "1", name: "ME", role: "ME" },
+  //   { id: "2", name: "Bob Joel", role: "Designer" },
+  //   { id: "3", name: "Charlie", role: "Product Manager" },
+  //   { id: "4", name: "Bob Joel", role: "Designer" },
+  //   { id: "5", name: "Charlie", role: "Product Manager" },
+  // ];
 
   // Define the ref with the appropriate type
   const optionsRef = useRef<BottomSheetModal>(null);

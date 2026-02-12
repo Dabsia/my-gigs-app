@@ -627,7 +627,7 @@ const Progress = () => {
             Project: {gig.title || "Untitled Project"}
           </Text>
           <Text className="text-base font-regular text-gray-600">
-            Client: {gig.client?.name || gig.clientInfo?.name || "No client"}
+            Client: {gig.client?.name || gig.client?.name || "No client"}
           </Text>
           <Text className="text-base font-regular text-gray-600 mt-1">
             Budget: {formatCurrency(gig.budget || 0)}

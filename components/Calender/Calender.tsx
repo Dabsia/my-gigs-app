@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Modal, Text, TouchableOpacity, View } from "react-native";
 import PrimaryBtn from "../PrimaryBtn/PrimaryBtn";
 
@@ -152,7 +152,7 @@ const Calendar = ({
             })}
           </View>
         </View>
-        <View>
+        <View className="pb-8">
           <PrimaryBtn text="Close" handlePress={setShowDatePicker} />
         </View>
       </View>

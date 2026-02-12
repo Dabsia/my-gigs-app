@@ -1,29 +1,30 @@
 import BackBtn from "@/components/BackBtn/BackBtn";
+import Calendar from "@/components/Calender/Calender";
 import Layout from "@/components/Layout/Layout";
 import PrimaryBtn from "@/components/PrimaryBtn/PrimaryBtn";
-import React, { useState, useEffect } from "react";
+import { formatDate } from "@/helpers/formatDate";
+import { API_BASE_URL } from "@/utils/config";
+import { useAuth } from "@clerk/clerk-expo";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  Modal,
-  Pressable,
-} from "react-native";
-import {
+  Calendar as CalendarIcon,
   ChevronDown,
   Plus,
   X,
-  Calendar as CalendarIcon,
 } from "lucide-react-native";
-import Calendar from "@/components/Calender/Calender";
-import { formatDate } from "@/helpers/formatDate";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { API_BASE_URL } from "@/utils/config";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function EditProject() {
   const router = useRouter();
@@ -31,7 +32,6 @@ export default function EditProject() {
   const { gigInfo, refreshOnGoBack } = useLocalSearchParams();
   // Parse and use the client data passed from the previous screen
   const gig = gigInfo ? JSON.parse(gigInfo as string) : null;
-  console.log("Project Data:", gig);
 
   const [showFormatDropdown, setShowFormatDropdown] = useState(false);
 
@@ -91,21 +91,29 @@ export default function EditProject() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
 
+  const { getToken } = useAuth(); // ✅ hook at top level
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      const t = await getToken();
+      setToken(t);
+    };
+    fetchToken();
+  }, [getToken]);
+
   // Edit state
   const [saving, setSaving] = useState(false);
 
   const projectFormats = ["Milestone", "full-project", "Hourly"];
 
   const handleEditProject = async () => {
+    console.log("gigInfo", gig);
     try {
       setSaving(true);
 
-      // Get auth token
-      const token = await AsyncStorage.getItem("auth_token");
-
       if (!token) {
-        Alert.alert("Error", "You are not logged in. Please log in again.");
-        router.replace("/auth/login");
+        router.replace("/");
         return;
       }
 
@@ -196,7 +204,7 @@ export default function EditProject() {
         if (response.status === 401) {
           errorMessage = "Session expired. Please log in again.";
           await AsyncStorage.clear();
-          router.replace("/auth/login");
+          router.replace("/");
         } else if (response.status === 400) {
           // Show specific validation errors if available
           if (data.errors && Array.isArray(data.errors)) {
@@ -300,7 +308,7 @@ export default function EditProject() {
   };
 
   const calculateMilestoneTotal = () => {
-    return milestones.reduce((total, milestone) => {
+    return milestones.reduce((total: number, milestone) => {
       const amount = parseFloat(milestone.amount) || 0;
       return total + amount;
     }, 0);
@@ -344,7 +352,7 @@ export default function EditProject() {
             </Text>
             <View className="w-full px-4 py-4 border border-gray-300 rounded-xl bg-white">
               <Text className="text-base font-regular text-gray-900">
-                {gig?.clientInfo?.name || "No client assigned"}
+                {gig?.client?.name || "No client assigned"}
               </Text>
             </View>
           </View>

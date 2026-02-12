@@ -19,6 +19,7 @@ const Logout = () => {
       console.error(JSON.stringify(err, null, 2));
     }
   };
+
   return (
     <TouchableOpacity
       onPress={handleSignOut}

@@ -94,8 +94,7 @@ export default function RootLayout() {
               <Stack.Screen name="userprofile/invoices" />
               <Stack.Screen name="userprofile/invoice/new" />
               <Stack.Screen name="userprofile/invoice/[id]" />
-              <Stack.Screen name="userprofile/drafts" />
-              <Stack.Screen name="userprofile/edit" />
+              {/* <Stack.Screen name="userprofile/edit" /> */}
               <Stack.Screen name="userprofile/bank" />
               <Stack.Screen name="userprofile/analytics" />
               <Stack.Screen name="notification/notification" />

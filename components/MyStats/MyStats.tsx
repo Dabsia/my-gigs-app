@@ -1,37 +1,12 @@
-import { View, Text, Pressable, ActivityIndicator } from "react-native";
-import React from "react";
 import ChargeIcon from "@/assets/icons/Charge";
-import { useRouter } from "expo-router";
 import { getInitials } from "@/helpers/getInitials";
+import { ClientsProps, ProjectData } from "@/interfaces";
+import { API_BASE_URL } from "@/utils/config";
+import { useAuth } from "@clerk/clerk-expo";
 import { useQuery } from "@tanstack/react-query";
-import { clientService } from "@/services/clientService";
-import { projectService } from "@/services/projectService"; // You'll need to create this
-
-interface ClientData {
-  _id: string;
-  name: string;
-  email: string;
-  company?: string;
-  phone?: string;
-  color?: string;
-}
-
-interface ClientsProps {
-  _id: string;
-  color: string;
-  name: string;
-}
-
-interface ProjectData {
-  _id: string;
-  title: string;
-  dueDate: string;
-  status: string;
-  clientInfo?: {
-    name: string;
-    company?: string;
-  };
-}
+import { useRouter } from "expo-router";
+import React from "react";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
 // Color palette for client avatars
 const CLIENT_COLORS = [
@@ -67,8 +42,9 @@ const formatDate = (dateString: string): string => {
 
 const MyStats = () => {
   const router = useRouter();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
 
-  // Fetch clients using React Query
+  // Fetch clients using React Query - direct fetch without service
   const {
     data: clientsData,
     isLoading: clientsLoading,
@@ -76,18 +52,84 @@ const MyStats = () => {
     refetch: refetchClients,
   } = useQuery({
     queryKey: ["clients"],
-    queryFn: clientService.getClients,
+    queryFn: async () => {
+      try {
+        const token = await getToken();
+        if (!token) throw new Error("No authentication token available");
+
+        console.log("Fetching clients...");
+        const response = await fetch(`${API_BASE_URL}/api/clients`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        const data = await response.json();
+        console.log("Clients response:", data);
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || `Failed to fetch clients (${response.status})`
+          );
+        }
+        console.log("Fetched clients data:", data);
+        return data;
+      } catch (error) {
+        console.error("Clients fetch error:", error);
+        throw error;
+      }
+    },
+    enabled: isLoaded && isSignedIn,
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch projects using React Query
+  // Fetch projects using React Query - direct fetch without service
+  // IMPORTANT: Using the correct endpoint from projectService - /api/project (singular)
   const {
     data: projectsData,
     isLoading: projectsLoading,
     error: projectsError,
+    refetch: refetchProjects,
   } = useQuery({
     queryKey: ["projects"],
-    queryFn: projectService.getProjects, // You need to create this service
+    queryFn: async () => {
+      try {
+        const token = await getToken();
+        if (!token) throw new Error("No authentication token available");
+
+        console.log("Fetching projects...");
+        const response = await fetch(`${API_BASE_URL}/api/project`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        let data;
+        try {
+          data = await response.json();
+        } catch (jsonErr) {
+          const text = await response.text();
+          console.error("Projects response not JSON:", text);
+          throw new Error(`Failed to parse projects response: ${text}`);
+        }
+        console.log("Projects response:", data);
+        if (!response.ok) {
+          console.error("Projects fetch failed:", response.status, data);
+          throw new Error(
+            data.message || `Failed to fetch projects (${response.status})`
+          );
+        }
+        return data;
+      } catch (error) {
+        console.error("Projects fetch error:", error);
+        throw error;
+      }
+    },
+    enabled: isLoaded && isSignedIn,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -98,8 +140,9 @@ const MyStats = () => {
   const clientWithMeeting = null;
 
   // Transform API data to match component interface
-  const clients: ClientsProps[] = clientsData?.success
-    ? clientsData.data.map((client: ClientData) => ({
+  // Check the structure of your API response
+  const clients: ClientsProps[] = clientsData?.data
+    ? clientsData.data.map((client: any) => ({
         _id: client._id,
         name: client.name,
         color: getClientColor(client._id),
@@ -135,7 +178,8 @@ const MyStats = () => {
     return sortedProjects[0];
   };
 
-  const dueGig = projectsData?.success
+  // Check the structure of your projects response
+  const dueGig = projectsData?.data
     ? findClosestDueGig(projectsData.data)
     : null;
 
@@ -144,11 +188,13 @@ const MyStats = () => {
     return getInitials(name) || "?";
   };
 
-  // Combined loading state for both clients and projects
-  const isLoading = clientsLoading || projectsLoading;
+  // Combined loading state - include Clerk loading state
+  const isLoading = !isLoaded || clientsLoading || projectsLoading;
 
   // Error state
   const hasError = clientsError || projectsError;
+  console.log("hasError:", clientsError);
+  console.log("hasError:", projectsError);
 
   const handlePress = () => {
     if (dueGig) {
@@ -158,8 +204,32 @@ const MyStats = () => {
           gigInfo: JSON.stringify(dueGig),
         },
       });
-    } else return;
+    }
   };
+
+  // Show loading while Clerk initializes
+  if (!isLoaded) {
+    return (
+      <View className="mt-10">
+        <Text className="font-semiBold text-[16px] mb-4">My Stats</Text>
+        <View className="mt-4 justify-between h-[200px] flex-row">
+          <View className="h-full bg-white w-[48%] py-5 items-center justify-between rounded-[10px]">
+            <ActivityIndicator size="small" color="#007AFF" />
+            <Text className="text-gray-500 text-sm">Initializing...</Text>
+          </View>
+          <View className="w-[48%] justify-between h-full">
+            <View className="w-full h-[48%] px-3 py-4 bg-secondary rounded-[10px] justify-center items-center">
+              <ActivityIndicator size="small" color="white" />
+              <Text className="text-white text-sm mt-2">Loading...</Text>
+            </View>
+            <View className="bg-white w-full h-[48%] px-3 py-2 rounded-[10px] justify-center items-center">
+              <ActivityIndicator size="small" color="#007AFF" />
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -215,6 +285,7 @@ const MyStats = () => {
               <Pressable
                 onPress={() => {
                   refetchClients();
+                  refetchProjects();
                 }}
                 className="bg-red-100 px-4 py-2 rounded-lg"
               >

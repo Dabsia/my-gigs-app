@@ -4,6 +4,7 @@ import PrimaryBtn from "@/components/PrimaryBtn/PrimaryBtn";
 import { getInitials } from "@/helpers/getInitials";
 import { UserData } from "@/interfaces";
 import { API_BASE_URL } from "@/utils/config";
+import { useAuth } from "@clerk/clerk-expo";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -22,6 +23,17 @@ export default function EditProfile() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const { getToken } = useAuth();
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      const token = await getToken();
+      setToken(token);
+    };
+    fetchToken();
+  }, [getToken]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -50,10 +62,6 @@ export default function EditProfile() {
           phoneNumber: parsedUser.phoneNumber || "",
           address: parsedUser.address || "",
         });
-
-        // Set display values (won't change while typing)
-        // setDisplayName(parsedUser.name || "");
-        // setDisplayProfession(parsedUser.profession || "");
 
         console.log("User loaded:", parsedUser);
       }
@@ -105,15 +113,6 @@ export default function EditProfile() {
       }
 
       setSaving(true);
-
-      // Get auth token
-      const token = await AsyncStorage.getItem("auth_token");
-
-      if (!token) {
-        Alert.alert("Error", "You are not logged in. Please log in again.");
-        router.replace("/auth/login");
-        return;
-      }
 
       console.log("Attempting to update profile...");
 
@@ -172,10 +171,6 @@ export default function EditProfile() {
 
         setUser(updatedUser);
 
-        // Update display values after successful save
-        // setDisplayName(formData.name);
-        // setDisplayProfession(formData.profession || "");
-
         // Update AsyncStorage
         await AsyncStorage.setItem("user_data", JSON.stringify(updatedUser));
 
@@ -190,8 +185,6 @@ export default function EditProfile() {
         if (response.status === 401) {
           errorMessage = "Session expired. Please log in again.";
           // Clear storage and redirect to login
-          await AsyncStorage.clear();
-          router.replace("/auth/login");
         } else if (response.status === 400) {
           errorMessage = data.message || "Please check your inputs";
         } else if (response.status === 500) {
@@ -226,8 +219,6 @@ export default function EditProfile() {
       ...prev,
       [field]: value,
     }));
-    // Note: We DON'T update displayName or displayProfession here
-    // They will only update after successful save
   };
 
   const handleCancel = () => {

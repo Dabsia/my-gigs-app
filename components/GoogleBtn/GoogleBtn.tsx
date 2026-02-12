@@ -36,7 +36,7 @@ export default function GoogleAuthButton() {
 
     try {
       const redirectUrl = AuthSession.makeRedirectUri({
-        useProxy: Platform.select({ web: false, default: true }),
+        scheme: "mygigsapp",
       });
 
       const { createdSessionId, setActive } = await startSSOFlow({
@@ -45,6 +45,7 @@ export default function GoogleAuthButton() {
       });
 
       if (createdSessionId && setActive) {
+        console.log("Session activated:", createdSessionId);
         await setActive({
           session: createdSessionId,
           navigate: async () => {
@@ -61,8 +62,6 @@ export default function GoogleAuthButton() {
       setLoading(false);
     }
   }, [loading]);
-
-  // const onPress = () => router.push("/(tabs)");
 
   return (
     <Pressable

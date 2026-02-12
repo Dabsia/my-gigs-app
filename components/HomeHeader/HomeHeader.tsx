@@ -1,10 +1,10 @@
-import { View, Text, Pressable } from "react-native";
-import React, { useEffect, useState } from "react";
 import NotificationIcon from "@/assets/icons/Notification";
-import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getFirstName, getInitials } from "@/helpers/getInitials";
 import { UserData } from "@/interfaces";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { Pressable, Text, View } from "react-native";
 
 const HomeHeader = () => {
   const router = useRouter();
@@ -24,8 +24,6 @@ const HomeHeader = () => {
         setUser(parsedUser);
 
         console.log("User loaded:", parsedUser);
-      } else {
-        console.log("No user data found in storage");
       }
     } catch (error) {
       console.error("Error loading user data:", error);

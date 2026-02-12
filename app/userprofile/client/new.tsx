@@ -2,22 +2,33 @@
 import BackBtn from "@/components/BackBtn/BackBtn";
 import Layout from "@/components/Layout/Layout";
 import PrimaryBtn from "@/components/PrimaryBtn/PrimaryBtn";
-import React, { useState } from "react";
+import { ClientData, clientService } from "@/services/clientService";
+import { useAuth } from "@clerk/clerk-expo";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  ScrollView,
   Text,
   TextInput,
-  Alert,
-  ScrollView,
-  ActivityIndicator,
   TouchableOpacity,
-  Keyboard,
+  View,
 } from "react-native";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientService, ClientData } from "@/services/clientService";
-import { useRouter } from "expo-router";
 
 export default function CreateClient() {
+  const { getToken } = useAuth(); // ✅ hook at top level
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      const t = await getToken();
+      setToken(t);
+    };
+    fetchToken();
+  }, [getToken]);
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -70,11 +81,9 @@ export default function CreateClient() {
 
   // Create client mutation
   const createClientMutation = useMutation({
-    mutationFn: clientService.createClient,
+    mutationFn: (data: ClientData) => clientService.createClient(data, token),
     onSuccess: (data) => {
-      // Invalidate clients query to refetch the list
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-
       router.back();
     },
     onError: (error: Error) => {

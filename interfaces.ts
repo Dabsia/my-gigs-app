@@ -4,18 +4,19 @@ export interface ClientInfo {
     phone: string;
     company: string;
     address: string
-  }
+    id: string;
+}
   
- export interface BoardSettings {
+export interface BoardSettings {
     progressPercentage: number;
     notes: string;
-  }
+}
   
-  export interface ProjectInterface {
+export interface ProjectInterface {
     _id: string;
     userId: string;
     clientId: string | null;
-    clientInfo: ClientInfo;
+    client: ClientInfo;
     title: string;
     description: string;
     status: 'not_started' | 'in_progress' | 'completed' | 'on_hold';
@@ -44,12 +45,38 @@ export interface ClientInfo {
     date: string; // Formatted date
     percent: number; // From boardSettings.progressPercentage
     gigType?: string; // Based on format
-  }
+}
 
-  export interface UserData {
+export interface UserData {
     firstName?: string;
     lastName?: string;
     email?: string;
     name?: string;
     // Add other user fields as needed
-  }
+}
+
+export interface ClientData {
+  _id: string;
+  name: string;
+  email: string;
+  company?: string;
+  phone?: string;
+  color?: string;
+}
+
+export interface ClientsProps {
+  _id: string;
+  color: string;
+  name: string;
+}
+
+export interface ProjectData {
+  _id: string;
+  title: string;
+  dueDate: string;
+  status: string;
+  client?: {
+    name: string;
+    company?: string;
+  };
+}

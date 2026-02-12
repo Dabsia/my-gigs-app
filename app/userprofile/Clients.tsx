@@ -2,22 +2,22 @@
 import BackBtn from "@/components/BackBtn/BackBtn";
 import CreateNewGig from "@/components/CreateNewGig/CreateNewGig";
 import Layout from "@/components/Layout/Layout";
-import { useFocusEffect, useRouter } from "expo-router";
-import { ChevronRight, Search, Filter } from "lucide-react-native";
-import React, { useState, useMemo, useEffect, useCallback } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Pressable,
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
-} from "react-native";
-import { useQuery, useQueryClient } from "@tanstack/react-query"; // Added useQueryClient
-import { clientService } from "@/services/clientService";
 import { getInitials } from "@/helpers/getInitials";
+import { clientService } from "@/services/clientService";
+import { useAuth } from "@clerk/clerk-expo";
+import { useQuery, useQueryClient } from "@tanstack/react-query"; // Added useQueryClient
+import { useFocusEffect, useRouter } from "expo-router";
+import { ChevronRight } from "lucide-react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 // Color palette for client avatars
 const CLIENT_COLORS = [
@@ -61,6 +61,17 @@ const Clients = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
 
+  const { getToken } = useAuth(); // ✅ hook at top level
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      const token = await getToken();
+      setToken(token);
+    };
+    fetchToken();
+  }, [getToken]);
+
   // Fetch clients using React Query
   const {
     data: clientsData,
@@ -70,7 +81,7 @@ const Clients = () => {
     isRefetching,
   } = useQuery({
     queryKey: ["clients"],
-    queryFn: clientService.getClients,
+    queryFn: () => clientService.getClients(token),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -133,6 +144,8 @@ const Clients = () => {
     });
   }, [clients, searchQuery, activeTab]);
 
+  console.log("Filtered clients:", filteredClients);
+
   const handleTabPress = (tab: string) => {
     setActiveTab(tab);
   };
@@ -149,16 +162,12 @@ const Clients = () => {
   useFocusEffect(
     React.useCallback(() => {
       // This runs when the screen comes into focus
-      console.log("Clients screen focused - refreshing data");
       queryClient.invalidateQueries({ queryKey: ["clients"] });
 
       // Optional: Force immediate refetch
       refetch();
 
       // Optional cleanup function (runs when screen loses focus)
-      return () => {
-        console.log("Clients screen lost focus");
-      };
     }, [queryClient, refetch])
   );
 

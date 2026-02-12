@@ -1,4 +1,5 @@
 import { projectService } from "@/services/projectService";
+import { useAuth } from "@clerk/clerk-expo";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React from "react";
@@ -14,11 +15,16 @@ const DeleteProjectModal = ({
   const router = useRouter();
 
   const queryClient = useQueryClient();
+  const { getToken } = useAuth();
 
   console.log(gig, "gigs");
 
   const { mutate: deleteProjectMutation } = useMutation({
-    mutationFn: () => projectService.deleteProject(gig._id),
+    mutationFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+      return projectService.deleteProject(gig._id, token);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["client-projects"] });

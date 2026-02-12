@@ -1,18 +1,18 @@
 import React, { useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Alert,
   Text,
   TextInput,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator,
+  View,
 } from "react-native";
 
-import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Layout from "@/components/Layout/Layout";
 import PrimaryBtn from "@/components/PrimaryBtn/PrimaryBtn";
 import { API_BASE_URL } from "@/utils/config";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -136,10 +136,6 @@ export default function Login() {
     );
   };
 
-  const handleSignup = () => {
-    router.push("/auth/register");
-  };
-
   return (
     <Layout>
       <View className="justify-between h-full">
@@ -211,16 +207,6 @@ export default function Login() {
               disabled={!email || !password || loading}
             />
           )}
-        </View>
-
-        {/* Signup Link */}
-        <View className="items-center mb-10">
-          <Text className="text-gray-600">
-            Don't have an account?{" "}
-            <Text className="text-blue-600 font-medium" onPress={handleSignup}>
-              Sign up
-            </Text>
-          </Text>
         </View>
       </View>
     </Layout>

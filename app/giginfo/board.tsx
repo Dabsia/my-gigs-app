@@ -1,26 +1,25 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-  Modal,
-  TextInput,
-  Alert,
-  Pressable,
-  ActivityIndicator,
-  RefreshControl,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import Layout from "@/components/Layout/Layout";
 import BackBtn from "@/components/BackBtn/BackBtn";
 import Calendar from "@/components/Calender/Calender"; // Assuming you have this component
+import Layout from "@/components/Layout/Layout";
 import { API_BASE_URL } from "@/utils/config";
-import { useLocalSearchParams } from "expo-router";
+import { useAuth } from "@clerk/clerk-expo";
+import { Ionicons } from "@expo/vector-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const COLUMN_WIDTH = SCREEN_WIDTH * 0.85;
@@ -100,6 +99,17 @@ const Board: React.FC = () => {
   const projectData = gig;
   const projectId = gig?._id;
 
+  const { getToken } = useAuth(); // ✅ hook at top level
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      const t = await getToken();
+      setToken(t);
+    };
+    fetchToken();
+  }, [getToken]);
+
   // State for columns - will be populated from API
   const [columns, setColumns] = useState<Column[]>([
     { id: "todo", title: "To Do", count: 0, tasks: [], color: "#4299E1" },
@@ -153,19 +163,8 @@ const Board: React.FC = () => {
   const [taskDescription, setTaskDescription] = useState("");
   const [taskTags, setTaskTags] = useState("");
 
-  // Fetch auth token utility
-  const getAuthToken = async () => {
-    const token = await AsyncStorage.getItem("auth_token");
-    if (!token) {
-      throw new Error("Authentication required");
-    }
-    return token;
-  };
-
   // Fetch project tasks - UPDATED to match your API response structure
   const fetchProjectTasks = async (): Promise<ApiBoardResponse> => {
-    const token = await getAuthToken();
-
     console.log(`Fetching board for project: ${projectId}`);
 
     const response = await fetch(
@@ -335,8 +334,6 @@ const Board: React.FC = () => {
         "_id" | "id" | "createdAt" | "updatedAt" | "position"
       >
     ) => {
-      const token = await getAuthToken();
-
       const response = await fetch(
         `${API_BASE_URL}/api/project/${projectId}/tasks`,
         {
@@ -380,8 +377,6 @@ const Board: React.FC = () => {
       taskId: string;
       updates: Partial<Task>;
     }) => {
-      const token = await getAuthToken();
-
       const response = await fetch(
         `${API_BASE_URL}/api/project/${projectId}/tasks/${taskId}`,
         {
@@ -424,8 +419,6 @@ const Board: React.FC = () => {
       taskId: string;
       newStatus: Status;
     }) => {
-      const token = await getAuthToken();
-
       const response = await fetch(
         `${API_BASE_URL}/api/project/${projectId}/tasks/${taskId}/move`,
         {
@@ -455,8 +448,6 @@ const Board: React.FC = () => {
 
   const deleteTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
-      const token = await getAuthToken();
-
       const response = await fetch(
         `${API_BASE_URL}/api/project/${projectId}/tasks/${taskId}`,
         {

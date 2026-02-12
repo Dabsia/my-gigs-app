@@ -1,11 +1,22 @@
 import GoogleAuthButton from "@/components/GoogleBtn/GoogleBtn";
 import Layout from "@/components/Layout/Layout";
+import { useUser } from "@clerk/clerk-expo";
+import { useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Image, Text, View } from "react-native";
 
 const Index = () => {
+  const router = useRouter();
   // const handleSubmit = () => {
   //   router.push("/auth/login");
   // };
+
+  const { isSignedIn } = useUser();
+  useEffect(() => {
+    if (isSignedIn) {
+      router.replace("/(tabs)");
+    }
+  }, [isSignedIn]);
 
   return (
     <Layout>

@@ -15,7 +15,6 @@ import {
   User,
   Users,
 } from "lucide-react-native";
-// import { logout } from "@/hooks/logout";
 
 export default function profile() {
   const router = useRouter();

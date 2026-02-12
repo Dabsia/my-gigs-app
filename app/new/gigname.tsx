@@ -1,37 +1,39 @@
 import BackBtn from "@/components/BackBtn/BackBtn";
+import Calendar from "@/components/Calender/Calender";
 import Layout from "@/components/Layout/Layout";
 import PrimaryBtn from "@/components/PrimaryBtn/PrimaryBtn";
-import React, { useState, useEffect } from "react";
+import { formatDate } from "@/helpers/formatDate";
+import { clientService } from "@/services/clientService";
+import { projectService } from "@/services/projectService";
+import { useAuth } from "@clerk/clerk-expo";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-  View,
+  Calendar as CalendarIcon,
+  ChevronDown,
+  Plus,
+  Users,
+  X,
+} from "lucide-react-native";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Modal,
+  Pressable,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  Alert,
-  Pressable,
-  Modal,
-  Dimensions,
-  ActivityIndicator,
+  View,
 } from "react-native";
-import {
-  ChevronDown,
-  Users,
-  Plus,
-  X,
-  Calendar as CalendarIcon,
-} from "lucide-react-native";
-import Calendar from "@/components/Calender/Calender";
-import { formatDate } from "@/helpers/formatDate";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientService } from "@/services/clientService";
-import { projectService } from "@/services/projectService";
-import { useRouter } from "expo-router";
-import { useLocalSearchParams } from "expo-router";
 
 export default function CreateProject() {
   const { client, clientId, clientName } = useLocalSearchParams();
   const router = useRouter();
+
+  const { getToken } = useAuth();
 
   // Parse the client data if it was passed
   const parsedClient = client ? JSON.parse(client as string) : null;
@@ -86,13 +88,23 @@ export default function CreateProject() {
     refetch: refetchClients,
   } = useQuery({
     queryKey: ["clients"],
-    queryFn: clientService.getClients,
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+
+      return clientService.getClients(token);
+    },
     staleTime: 5 * 60 * 1000,
   });
 
   // Mutation for creating a new client
   const createClientMutation = useMutation({
-    mutationFn: clientService.createClient,
+    mutationFn: async (clientData) => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+
+      return clientService.createClient(clientData, token);
+    },
     onSuccess: (data) => {
       if (data.success) {
         // Invalidate and refetch clients query
@@ -121,7 +133,12 @@ export default function CreateProject() {
 
   // Mutation for creating a new project
   const createProjectMutation = useMutation({
-    mutationFn: projectService.createProject,
+    mutationFn: async (projectData) => {
+      const token = await getToken();
+      if (!token) throw new Error("No auth token");
+
+      return projectService.createProject(projectData, token);
+    },
     onSuccess: (data) => {
       if (data.success) {
         // Invalidate and refetch projects query
@@ -168,8 +185,6 @@ export default function CreateProject() {
         setSelectedClientId(clientId as string);
         setSelectedClientName(clientName as string);
       }
-    } else {
-      console.log("No client data passed, user will select manually");
     }
   }, [parsedClient, clientId, clientName]);
 
@@ -181,9 +196,6 @@ export default function CreateProject() {
         console.log(
           "Selected client not found in clients list, clearing selection"
         );
-        // Optional: Clear the selection if client doesn't exist
-        // setSelectedClientId("");
-        // setSelectedClientName("");
       }
     }
   }, [clients, selectedClientId]);

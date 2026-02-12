@@ -1,21 +1,32 @@
-// services/projectService.js
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "@/utils/config";
 
-const getAuthToken = async (): Promise<string> => {
-  const token = await AsyncStorage.getItem("auth_token");
-  if (!token) throw new Error("You are not logged in");
-  return token;
-};
+export interface ProjectData {
+  title: string;
+  clientId?: string;
+  description?: string;
+  budget?: number;
+  hourlyRate?: number;
+  startingAmount?: number;
+  dueDate: string;
+  startDate: string;
+  format: string;
+  milestones?: Array<{
+    title: string;
+    amount: number;
+    dueDate: string;
+  }>;
+}
 
 export const projectService = {
-  createProject: async (projectData:any) => {
-    const authToken = await getAuthToken();
+  createProject: async (projectData: ProjectData, token: string) => {
+    if (!token) {
+      throw new Error("You are not logged in");
+    }
 
     const response = await fetch(`${API_BASE_URL}/api/project`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${authToken}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(projectData),
@@ -32,14 +43,15 @@ export const projectService = {
     return data;
   },
 
-  // You can add other project-related methods here
-  getProjects: async () => {
-    const authToken = await getAuthToken();
+  getProjects: async (token: string) => {
+    if (!token) {
+      throw new Error("You are not logged in");
+    }
 
     const response = await fetch(`${API_BASE_URL}/api/projects`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${authToken}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     });
@@ -55,16 +67,17 @@ export const projectService = {
     return data;
   },
 
-  deleteProject: async (projectId: string) => {
-    const authToken = await AsyncStorage.getItem("auth_token");
-    if (!authToken) throw new Error("You are not logged in");
+  deleteProject: async (projectId: string, token: string) => {
+    if (!token) {
+      throw new Error("You are not logged in");
+    }
   
     const response = await fetch(
       `${API_BASE_URL}/api/project/${projectId}`,
       {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${authToken}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       }
@@ -83,30 +96,26 @@ export const projectService = {
 };
 
 // Service function to fetch client projects
-export const fetchClientProjects = async (clientId: string) => {
-    const authToken = await AsyncStorage.getItem("auth_token");
-    if (!authToken) {
-      throw new Error("You are not logged in");
-    }
-  
-    // Use the new endpoint
-    const response = await fetch(`${API_BASE_URL}/api/projects/client/${clientId}`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        "Content-Type": "application/json",
-      },
-    });
-  
-    const data = await response.json();
-  
-    if (!response.ok) {
-      throw new Error(
-        data.message || `Failed to fetch client projects (${response.status})`
-      );
-    }
-  
-    return data;
-  };
+export const fetchClientProjects = async (clientId: string, token: string) => {
+  if (!token) {
+    throw new Error("You are not logged in");
+  }
 
-  
+  const response = await fetch(`${API_BASE_URL}/api/projects/client/${clientId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.message || `Failed to fetch client projects (${response.status})`
+    );
+  }
+
+  return data;
+};

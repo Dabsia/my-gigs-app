@@ -41,7 +41,7 @@ export default function TabLayout() {
           height: 80,
           display: "flex",
           paddingTop: 23,
-          top: -45,
+          // top: -45,
           alignItems: "center", // Center items vertically
           justifyContent: "center", // Center items horizontally
         },

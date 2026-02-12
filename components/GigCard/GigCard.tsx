@@ -1,10 +1,10 @@
-import { View, Text, Image, Pressable } from "react-native";
-import React from "react";
-import { useRouter } from "expo-router";
-import CircularProgress from "../CircularProgress/CircularProgress";
-import { ProjectInterface } from "@/interfaces";
 import { formatDate } from "@/helpers/formatDate";
 import { getInitials } from "@/helpers/getInitials";
+import { ProjectInterface } from "@/interfaces";
+import { useRouter } from "expo-router";
+import React from "react";
+import { Pressable, Text, View } from "react-native";
+import CircularProgress from "../CircularProgress/CircularProgress";
 
 // Color palette for client avatars
 const CLIENT_COLORS = [
@@ -47,18 +47,11 @@ const GigCard = ({ item }: { item: ProjectInterface }) => {
     });
   };
 
-  const {
-    title,
-    dueDate,
-    progressPercentage,
-    name,
-    percent,
-    date,
-    clientInfo,
-  } = item;
+  const { title, dueDate, progressPercentage, name, percent, date, client } =
+    item;
 
-  // Handle missing clientInfo
-  const clientName = clientInfo?.name || "Client";
+  // Handle missing client
+  const clientName = client?.name || "Client";
   const clientInitials = getInitials(clientName);
 
   // Get color based on client name

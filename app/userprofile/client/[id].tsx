@@ -2,22 +2,22 @@ import BackBtn from "@/components/BackBtn/BackBtn";
 import CreateNewGig from "@/components/CreateNewGig/CreateNewGig";
 import GigCard from "@/components/GigCard/GigCard";
 import Layout from "@/components/Layout/Layout";
+import { API_BASE_URL } from "@/utils/config";
+import { useAuth } from "@clerk/clerk-expo";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pencil, Trash } from "lucide-react-native";
-import { useState, useMemo, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  Pressable,
   ActivityIndicator,
   Alert,
+  FlatList,
+  Pressable,
   RefreshControl,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { API_BASE_URL } from "@/utils/config";
 
 // ============================================================================
 // TYPES
@@ -40,7 +40,7 @@ interface Project {
   totalAmount?: number;
   amountPaid?: number;
   clientId?: string | { _id: string; name?: string };
-  clientInfo?: {
+  client?: {
     _id?: string;
     name?: string;
     email?: string;
@@ -59,7 +59,7 @@ interface TransformedGig {
   isOverdue: boolean;
   totalAmount: number;
   amountPaid: number;
-  clientInfo?: { name: string };
+  client?: { name: string };
 }
 
 interface Client {
@@ -88,42 +88,9 @@ type TabType = "all" | "active" | "overdue";
 // API SERVICE FUNCTIONS
 // ============================================================================
 
-const getAuthToken = async (): Promise<string> => {
-  const token = await AsyncStorage.getItem("auth_token");
-  if (!token) throw new Error("You are not logged in");
-  return token;
-};
-
-// OPTION 1: Use dedicated endpoint for client projects
-const fetchClientProjects = async (clientId: string) => {
-  const authToken = await getAuthToken();
-
-  // Try dedicated endpoint first, fallback to filtered endpoint
-  try {
-    // Try /api/projects/client/:clientId if it exists
-    const response = await fetch(
-      `${API_BASE_URL}/api/projects/client/${clientId}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch (error) {
-    console.log(
-      "Dedicated endpoint not available, trying filtered endpoint..."
-    );
-  }
-
-  // Fallback to filtered endpoint with query parameter
+const fetchClientProjects = async (clientId: string, authToken: string) => {
   const response = await fetch(
-    `${API_BASE_URL}/api/project?clientId=${clientId}`,
+    `${API_BASE_URL}/api/projects/client/${clientId}`,
     {
       method: "GET",
       headers: {
@@ -144,16 +111,17 @@ const fetchClientProjects = async (clientId: string) => {
   return data;
 };
 
-const fetchClientDetails = async (clientId: string) => {
-  const authToken = await getAuthToken();
-
-  const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${authToken}`,
-      "Content-Type": "application/json",
-    },
-  });
+const fetchClientDetails = async (clientId: string, authToken: string) => {
+  const response = await fetch(
+    `${API_BASE_URL}/api/projects/client/${clientId}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
 
   const data = await response.json();
 
@@ -166,15 +134,21 @@ const fetchClientDetails = async (clientId: string) => {
   return data;
 };
 
-const deleteClient = async (clientId: string) => {
-  const authToken = await getAuthToken();
+const deleteClient = async (
+  clientId: string,
+  getToken: () => Promise<string>
+) => {
+  const authToken = await getToken();
 
-  const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${authToken}`,
-    },
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/api/projects/client/${clientId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    }
+  );
 
   if (!response.ok) {
     const data = await response.json();
@@ -192,16 +166,10 @@ const transformProjectToGig = (
   project: Project,
   currentClient: Client
 ): TransformedGig => {
-  // Extract client name from project data or use current client
-  let clientName = "Client";
-
-  if (project.clientInfo?.name) {
-    clientName = project.clientInfo.name;
-  } else if (typeof project.clientId === "object" && project.clientId.name) {
-    clientName = project.clientId.name;
-  } else {
-    clientName = currentClient.name;
-  }
+  let clientName =
+    project.client?.name ||
+    (typeof project.clientId === "object" && project.clientId.name) ||
+    currentClient.name;
 
   const dueDate = project.dueDate ? new Date(project.dueDate) : null;
   const displayDate = dueDate
@@ -227,10 +195,10 @@ const transformProjectToGig = (
     percent: project.progressPercentage || project.progress || 0,
     gigType: project.format || project.type || "personal",
     status: project.status || "active",
-    isOverdue: isOverdue,
+    isOverdue,
     totalAmount: project.totalAmount || 0,
     amountPaid: project.amountPaid || 0,
-    clientInfo: { name: clientName },
+    client: { name: clientName },
   };
 };
 
@@ -270,6 +238,16 @@ export default function ClientProfile() {
   const [activeTab, setActiveTab] = useState<TabType>("all");
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { getToken } = useAuth();
+  const [authToken, setAuthToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchToken = async () => {
+      const token = await getToken();
+      setAuthToken(token);
+    };
+    fetchToken();
+  }, [getToken]);
 
   // ============================================================================
   // DATA FETCHING
@@ -282,8 +260,8 @@ export default function ClientProfile() {
     refetch: refetchClient,
   } = useQuery({
     queryKey: ["client", id],
-    queryFn: () => fetchClientDetails(id as string),
-    enabled: !!id,
+    queryFn: () => fetchClientDetails(id as string, authToken as string),
+    enabled: !!id && !!authToken,
   });
 
   const {
@@ -294,107 +272,79 @@ export default function ClientProfile() {
     isRefetching,
   } = useQuery({
     queryKey: ["clientProjects", id],
-    queryFn: () => fetchClientProjects(id as string),
-    // queryFn: () => fetchAllProjectsAndFilter(id as string), // Use this if above doesn't work
-    enabled: !!id,
+    queryFn: () => fetchClientProjects(id as string, authToken as string),
+    enabled: !!id && !!authToken,
   });
 
   // ============================================================================
-  // COMPUTED VALUES - ALL HOOKS BEFORE EARLY RETURNS
+  // COMPUTED VALUES
   // ============================================================================
 
   const currentClient = useMemo<Client>(() => {
-    const client = clientData?.data || {
-      id: id as string,
-      name: "Unknown Client",
-      company: "Unknown Company",
-      email: "",
-      phone: "",
-      status: "active",
-      hasOverdue: false,
-      initials: "UC",
-    };
-    return client;
+    return (
+      clientData?.data || {
+        id: id as string,
+        name: "Unknown Client",
+        company: "Unknown Company",
+        email: "",
+        phone: "",
+        status: "active",
+        hasOverdue: false,
+        initials: "UC",
+      }
+    );
   }, [clientData?.data, id]);
 
   const allGigs = useMemo<TransformedGig[]>(() => {
-    if (!projectsData?.data || !Array.isArray(projectsData.data)) {
-      console.log("No projects data or not an array");
-      return [];
-    }
-
-    console.log("Raw projects:", projectsData.data.length, "projects");
-
-    const transformedGigs = projectsData.data.map((project: Project) => {
-      return transformProjectToGig(project, currentClient);
-    });
-
-    return transformedGigs;
+    if (!projectsData?.data || !Array.isArray(projectsData.data)) return [];
+    return projectsData.data.map((p: Project) =>
+      transformProjectToGig(p, currentClient)
+    );
   }, [projectsData?.data, currentClient]);
 
   const filteredGigs = useMemo<TransformedGig[]>(() => {
-    let result: TransformedGig[] = [];
-
     switch (activeTab) {
-      case "all":
-        result = allGigs;
-        break;
       case "active":
-        result = allGigs.filter(
-          (gig) => gig.status === "in_progress" || gig.status === "not_started"
+        return allGigs.filter(
+          (g) => g.status === "in_progress" || g.status === "not_started"
         );
-        break;
       case "overdue":
-        result = allGigs.filter(
-          (gig) =>
-            gig.isOverdue &&
-            gig.status !== "completed" &&
-            gig.status !== "archived"
+        return allGigs.filter(
+          (g) =>
+            g.isOverdue && g.status !== "completed" && g.status !== "archived"
         );
-        break;
       default:
-        result = allGigs;
+        return allGigs;
     }
-
-    return result;
   }, [allGigs, activeTab]);
 
   const tabStats = useMemo(() => {
-    const activeGigs = allGigs.filter(
-      (gig) => gig.status === "in_progress" || gig.status === "not_started"
-    );
-    const overdueGigs = allGigs.filter(
-      (gig) =>
-        gig.isOverdue && gig.status !== "completed" && gig.status !== "archived"
-    );
-
     return {
       all: allGigs.length,
-      active: activeGigs.length,
-      overdue: overdueGigs.length,
+      active: allGigs.filter(
+        (g) => g.status === "in_progress" || g.status === "not_started"
+      ).length,
+      overdue: allGigs.filter(
+        (g) =>
+          g.isOverdue && g.status !== "completed" && g.status !== "archived"
+      ).length,
     };
   }, [allGigs]);
 
-  const clientStats = useMemo<ClientStats>(
-    () => calculateClientStats(allGigs),
-    [allGigs]
-  );
+  const clientStats = useMemo(() => calculateClientStats(allGigs), [allGigs]);
 
   const onRefresh = useCallback(() => {
     refetchClient();
     refetchProjects();
   }, [refetchClient, refetchProjects]);
 
-  const handleTabPress = useCallback((tab: TabType) => {
-    setActiveTab(tab);
-  }, []);
+  const handleTabPress = useCallback((tab: TabType) => setActiveTab(tab), []);
 
-  // Add queryClient to dependencies// In your ClientProfile component, update the handleDeleteClient function:
   const handleDeleteClient = useCallback(async () => {
     if (allGigs.length > 0) {
       Alert.alert(
         "Cannot Delete Client",
-        `This client has ${allGigs.length} project(s). Please delete or reassign the projects before deleting the client.`,
+        `This client has ${allGigs.length} project(s). Delete or reassign projects first.`,
         [{ text: "OK", style: "default" }]
       );
       return;
@@ -410,11 +360,8 @@ export default function ClientProfile() {
           style: "destructive",
           onPress: async () => {
             try {
-              await deleteClient(id as string);
-
-              // CRITICAL: Invalidate the clients cache BEFORE navigating back
+              await deleteClient(id as string, getToken);
               queryClient.invalidateQueries({ queryKey: ["clients"] });
-
               Alert.alert("Success", "Client deleted successfully");
               router.back();
             } catch (error) {
@@ -429,15 +376,13 @@ export default function ClientProfile() {
         },
       ]
     );
-  }, [allGigs.length, currentClient.name, id, router, queryClient]); // Add queryClient to dependencies
-  // ============================================================================
-  // RENDER FUNCTIONS
-  // ============================================================================
+  }, [allGigs.length, currentClient.name, id, router, queryClient, getToken]);
 
   const renderGigItem = useCallback(
     ({ item }: { item: TransformedGig }) => <GigCard item={item} />,
     []
   );
+  const keyExtractor = useCallback((item: TransformedGig) => item.id, []);
 
   const renderEmptyState = useCallback(() => {
     const emptyStates = {
@@ -457,7 +402,6 @@ export default function ClientProfile() {
         showButton: false,
       },
     };
-
     const { title, message, showButton } = emptyStates[activeTab];
 
     return (
@@ -478,12 +422,6 @@ export default function ClientProfile() {
       </View>
     );
   }, [activeTab, id, router]);
-
-  const keyExtractor = useCallback((item: TransformedGig) => item.id, []);
-
-  // ============================================================================
-  // EARLY RETURNS FOR LOADING/ERROR STATES
-  // ============================================================================
 
   if (isLoadingClient || isLoadingProjects) {
     return (
@@ -522,8 +460,8 @@ export default function ClientProfile() {
               } text-center mb-4`}
             >
               {is404
-                ? "This client doesn't exist or has been deleted."
-                : errorMessage}
+                ? errorMessage
+                : "This client doesn't exist or has been deleted."}
             </Text>
             <TouchableOpacity
               onPress={is404 ? () => router.back() : onRefresh}
@@ -545,10 +483,6 @@ export default function ClientProfile() {
     );
   }
 
-  // ============================================================================
-  // MAIN RENDER
-  // ============================================================================
-
   return (
     <Layout>
       <View className="flex-1">
@@ -561,9 +495,7 @@ export default function ClientProfile() {
               onPress={() =>
                 router.push({
                   pathname: "/userprofile/client/edit/",
-                  params: {
-                    client: JSON.stringify(currentClient),
-                  },
+                  params: { client: JSON.stringify(currentClient) },
                 })
               }
             >
@@ -716,7 +648,6 @@ export default function ClientProfile() {
         />
 
         {/* Create New Project Button */}
-        {/* <CreateNewGig location={`new/gigname`} /> */}
         <CreateNewGig location="new/gigname" clientData={currentClient} />
       </View>
     </Layout>
