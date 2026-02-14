@@ -26,14 +26,10 @@ const Profile = () => {
   const router = useRouter();
   const { getToken, isSignedIn, isLoaded } = useAuth();
 
-  console.log("isLoaded:", isLoaded);
-  console.log("isSignedIn:", isSignedIn);
-
   const { data, isLoading, error } = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
       const token = await getToken();
-      console.log("this is tokenn", token);
 
       if (!token) {
         throw new Error("Failed to get authentication token");
@@ -58,8 +54,6 @@ const Profile = () => {
 
   // Get user data from MongoDB response
   const userData = data?.user;
-
-  console.log("this is the returned data", data);
 
   const userName = {
     firstName: userData?.name?.split(" ")[0] || "User",

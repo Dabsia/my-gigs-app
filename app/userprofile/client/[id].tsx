@@ -2,12 +2,19 @@ import BackBtn from "@/components/BackBtn/BackBtn";
 import CreateNewGig from "@/components/CreateNewGig/CreateNewGig";
 import GigCard from "@/components/GigCard/GigCard";
 import Layout from "@/components/Layout/Layout";
+import {
+  Client,
+  ClientStats,
+  Project,
+  TabType,
+  TransformedGig,
+} from "@/interfaces";
 import { API_BASE_URL } from "@/utils/config";
 import { useAuth } from "@clerk/clerk-expo";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pencil, Trash } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -19,148 +26,15 @@ import {
   View,
 } from "react-native";
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-type ProjectStatus = "not_started" | "in_progress" | "completed" | "archived";
-
-interface Project {
-  _id: string;
-  title?: string;
-  name?: string;
-  dueDate?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  progressPercentage?: number;
-  progress?: number;
-  format?: string;
-  type?: string;
-  status?: ProjectStatus;
-  totalAmount?: number;
-  amountPaid?: number;
-  clientId?: string | { _id: string; name?: string };
-  client?: {
-    _id?: string;
-    name?: string;
-    email?: string;
-    phone?: string;
-    company?: string;
-  };
+interface ClientResponse {
+  success: boolean;
+  data: Client;
 }
 
-interface TransformedGig {
-  id: string;
-  name: string;
-  date: string;
-  percent: number;
-  gigType: string;
-  status: string;
-  isOverdue: boolean;
-  totalAmount: number;
-  amountPaid: number;
-  client?: { name: string };
+interface ProjectsResponse {
+  success: boolean;
+  data: Project[];
 }
-
-interface Client {
-  id: string;
-  name: string;
-  company?: string;
-  email?: string;
-  phone?: string;
-  status: string;
-  hasOverdue: boolean;
-  initials: string;
-}
-
-interface ClientStats {
-  totalProjects: number;
-  activeProjects: number;
-  completedProjects: number;
-  overdueProjects: number;
-  totalRevenue: number;
-  totalPaid: number;
-}
-
-type TabType = "all" | "active" | "overdue";
-
-// ============================================================================
-// API SERVICE FUNCTIONS
-// ============================================================================
-
-const fetchClientProjects = async (clientId: string, authToken: string) => {
-  const response = await fetch(
-    `${API_BASE_URL}/api/projects/client/${clientId}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data.message || `Failed to fetch client projects (${response.status})`
-    );
-  }
-
-  return data;
-};
-
-const fetchClientDetails = async (clientId: string, authToken: string) => {
-  const response = await fetch(
-    `${API_BASE_URL}/api/projects/client/${clientId}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data.message || `Failed to fetch client (${response.status})`
-    );
-  }
-
-  return data;
-};
-
-const deleteClient = async (
-  clientId: string,
-  getToken: () => Promise<string>
-) => {
-  const authToken = await getToken();
-
-  const response = await fetch(
-    `${API_BASE_URL}/api/projects/client/${clientId}`,
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    const data = await response.json();
-    throw new Error(data.message || "Failed to delete client");
-  }
-
-  return response;
-};
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
 
 const transformProjectToGig = (
   project: Project,
@@ -229,28 +103,103 @@ const calculateClientStats = (gigs: TransformedGig[]): ClientStats => {
   };
 };
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
 export default function ClientProfile() {
   const { id } = useLocalSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>("all");
   const router = useRouter();
   const queryClient = useQueryClient();
   const { getToken } = useAuth();
-  const [authToken, setAuthToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchToken = async () => {
-      const token = await getToken();
-      setAuthToken(token);
-    };
-    fetchToken();
-  }, [getToken]);
 
   // ============================================================================
-  // DATA FETCHING
+  // API FUNCTIONS
+  // ============================================================================
+
+  const fetchClientDetails = async (): Promise<Client> => {
+    const token = await getToken();
+    if (!token) throw new Error("No auth token");
+
+    const response = await fetch(`${API_BASE_URL}/api/projects/client/${id}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("res", response);
+
+    const data: ClientResponse = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || `Failed to fetch client (${response.status})`
+      );
+    }
+
+    if (!data.success) {
+      throw new Error(data.message || "Failed to fetch client");
+    }
+
+    return data.data;
+  };
+
+  const fetchClientProjects = async (): Promise<Project[]> => {
+    const token = await getToken();
+    if (!token) throw new Error("No auth token");
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/projects/client/${id}/projects`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data: ProjectsResponse = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || `Failed to fetch client projects (${response.status})`
+      );
+    }
+
+    if (!data.success) {
+      throw new Error(data.message || "Failed to fetch client projects");
+    }
+    console.log("ffetchedCliients", data);
+    return data.data;
+  };
+
+  const deleteClient = async (): Promise<void> => {
+    const token = await getToken();
+    if (!token) throw new Error("No auth token");
+
+    const response = await fetch(`${API_BASE_URL}/api/projects/client/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to delete client");
+    }
+
+    if (!data.success) {
+      throw new Error(data.message || "Failed to delete client");
+    }
+
+    return data;
+  };
+
+  // ============================================================================
+  // REACT QUERY HOOKS
   // ============================================================================
 
   const {
@@ -258,22 +207,36 @@ export default function ClientProfile() {
     isLoading: isLoadingClient,
     error: clientError,
     refetch: refetchClient,
-  } = useQuery({
+  } = useQuery<Client>({
     queryKey: ["client", id],
-    queryFn: () => fetchClientDetails(id as string, authToken as string),
-    enabled: !!id && !!authToken,
+    queryFn: fetchClientDetails,
+    enabled: !!id,
   });
 
   const {
-    data: projectsData,
+    data: projects = [],
     isLoading: isLoadingProjects,
     error: projectsError,
     refetch: refetchProjects,
     isRefetching,
-  } = useQuery({
-    queryKey: ["clientProjects", id],
-    queryFn: () => fetchClientProjects(id as string, authToken as string),
-    enabled: !!id && !!authToken,
+  } = useQuery<Project[]>({
+    queryKey: ["client-projects", id],
+    queryFn: fetchClientProjects,
+    enabled: !!id,
+  });
+
+  const deleteClientMutation = useMutation({
+    mutationFn: deleteClient,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["client", id] });
+      queryClient.invalidateQueries({ queryKey: ["client-projects", id] });
+      Alert.alert("Success", "Client deleted successfully");
+      router.back();
+    },
+    onError: (error: Error) => {
+      Alert.alert("Error", error.message || "Failed to delete client");
+    },
   });
 
   // ============================================================================
@@ -282,7 +245,7 @@ export default function ClientProfile() {
 
   const currentClient = useMemo<Client>(() => {
     return (
-      clientData?.data || {
+      clientData || {
         id: id as string,
         name: "Unknown Client",
         company: "Unknown Company",
@@ -293,14 +256,14 @@ export default function ClientProfile() {
         initials: "UC",
       }
     );
-  }, [clientData?.data, id]);
+  }, [clientData, id]);
 
   const allGigs = useMemo<TransformedGig[]>(() => {
-    if (!projectsData?.data || !Array.isArray(projectsData.data)) return [];
-    return projectsData.data.map((p: Project) =>
+    if (!projects || !Array.isArray(projects)) return [];
+    return projects.map((p: Project) =>
       transformProjectToGig(p, currentClient)
     );
-  }, [projectsData?.data, currentClient]);
+  }, [projects, currentClient]);
 
   const filteredGigs = useMemo<TransformedGig[]>(() => {
     switch (activeTab) {
@@ -358,25 +321,11 @@ export default function ClientProfile() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteClient(id as string, getToken);
-              queryClient.invalidateQueries({ queryKey: ["clients"] });
-              Alert.alert("Success", "Client deleted successfully");
-              router.back();
-            } catch (error) {
-              Alert.alert(
-                "Error",
-                error instanceof Error
-                  ? error.message
-                  : "Failed to delete client"
-              );
-            }
-          },
+          onPress: () => deleteClientMutation.mutate(),
         },
       ]
     );
-  }, [allGigs.length, currentClient.name, id, router, queryClient, getToken]);
+  }, [allGigs.length, currentClient.name, deleteClientMutation]);
 
   const renderGigItem = useCallback(
     ({ item }: { item: TransformedGig }) => <GigCard item={item} />,
@@ -423,6 +372,10 @@ export default function ClientProfile() {
     );
   }, [activeTab, id, router]);
 
+  // ============================================================================
+  // LOADING STATES
+  // ============================================================================
+
   if (isLoadingClient || isLoadingProjects) {
     return (
       <Layout>
@@ -433,6 +386,9 @@ export default function ClientProfile() {
       </Layout>
     );
   }
+
+  console.log("clientError", clientError);
+  console.log("projectError", projectsError);
 
   if (clientError || projectsError) {
     const errorMessage =
@@ -501,8 +457,15 @@ export default function ClientProfile() {
             >
               <Pencil fill="#061D3F" size={25} color="#061D3F" />
             </Pressable>
-            <Pressable onPress={handleDeleteClient}>
-              <Trash fill="red" size={25} color="white" />
+            <Pressable
+              onPress={handleDeleteClient}
+              disabled={deleteClientMutation.isPending}
+            >
+              {deleteClientMutation.isPending ? (
+                <ActivityIndicator size="small" color="red" />
+              ) : (
+                <Trash fill="red" size={25} color="white" />
+              )}
             </Pressable>
           </View>
         </View>

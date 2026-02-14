@@ -2,6 +2,7 @@ import BackBtn from "@/components/BackBtn/BackBtn";
 import Layout from "@/components/Layout/Layout";
 import PrimaryBtn from "@/components/PrimaryBtn/PrimaryBtn";
 import { API_BASE_URL } from "@/utils/config";
+import { useAuth } from "@clerk/clerk-expo";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pause, Play, Square } from "lucide-react-native";
@@ -18,6 +19,7 @@ import {
 
 const Progress = () => {
   const router = useRouter();
+  const { getToken } = useAuth(); // ✅ hook at top level
   const { gigInfo } = useLocalSearchParams();
   const gig = gigInfo ? JSON.parse(gigInfo as string) : null;
 
@@ -90,7 +92,7 @@ const Progress = () => {
   // Fetch time summary
   const fetchTimeSummary = async () => {
     try {
-      const token = await AsyncStorage.getItem("auth_token");
+      const token = await getToken();
       if (!token || !projectId) return;
 
       setSummaryLoading(true);
@@ -124,7 +126,7 @@ const Progress = () => {
 
   const fetchCurrentTimer = async () => {
     try {
-      const token = await AsyncStorage.getItem("auth_token");
+      const token = await getToken();
       if (!token || !projectId) return;
 
       const response = await fetch(
@@ -276,10 +278,10 @@ const Progress = () => {
     }
 
     try {
-      const token = await AsyncStorage.getItem("auth_token");
+      const token = await getToken();
       if (!token) {
         Alert.alert("Error", "You are not logged in");
-        router.replace("/auth/login");
+        router.replace("/");
         return;
       }
 
@@ -296,7 +298,7 @@ const Progress = () => {
 
   const startTimeTracking = async () => {
     try {
-      const token = await AsyncStorage.getItem("auth_token");
+      const token = await getToken();
 
       const response = await fetch(
         `${API_BASE_URL}/api/project/${projectId}/time/start`,
@@ -343,7 +345,7 @@ const Progress = () => {
 
   const handlePauseTimer = async () => {
     try {
-      const token = await AsyncStorage.getItem("auth_token");
+      const token = await getToken();
 
       const response = await fetch(
         `${API_BASE_URL}/api/project/${projectId}/time/pause`,
@@ -392,7 +394,7 @@ const Progress = () => {
 
   const resumeTimeTracking = async () => {
     try {
-      const token = await AsyncStorage.getItem("auth_token");
+      const token = await getToken();
 
       const response = await fetch(
         `${API_BASE_URL}/api/project/${projectId}/time/resume`,
@@ -431,7 +433,7 @@ const Progress = () => {
 
   const handleStopTimer = async () => {
     try {
-      const token = await AsyncStorage.getItem("auth_token");
+      const token = await getToken();
 
       const response = await fetch(
         `${API_BASE_URL}/api/project/${projectId}/time/stop`,
@@ -516,7 +518,7 @@ const Progress = () => {
         await handleStopTimer();
       }
 
-      const token = await AsyncStorage.getItem("auth_token");
+      const token = await getToken();
       if (!token) {
         Alert.alert("Error", "You are not logged in");
         router.replace("/auth/login");

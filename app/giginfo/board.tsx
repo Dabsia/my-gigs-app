@@ -1,11 +1,12 @@
 import BackBtn from "@/components/BackBtn/BackBtn";
 import Calendar from "@/components/Calender/Calender"; // Assuming you have this component
 import Layout from "@/components/Layout/Layout";
+import { ApiBoardResponse, Column, Priority, Status, Task } from "@/interfaces";
 import { API_BASE_URL } from "@/utils/config";
 import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,73 +25,7 @@ import {
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const COLUMN_WIDTH = SCREEN_WIDTH * 0.85;
 
-type Priority = "low" | "medium" | "high";
-type Status = "todo" | "in_progress" | "review" | "done";
-
-// Update Task interface
-interface Task {
-  _id: string;
-  id?: string;
-  title: string;
-  projectId: string;
-  dueDate: string; // Formatted for display
-  dueDateISO: string; // Original ISO string
-  priority: Priority;
-  description?: string;
-  tags?: string[];
-  status: Status;
-  position: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface Column {
-  id: Status;
-  title: string;
-  count: number;
-  tasks: Task[];
-  color?: string;
-  wipLimit?: number | null;
-}
-
-interface ProjectData {
-  _id: string;
-  name: string;
-  description?: string;
-}
-
-interface TaskStats {
-  todo: number;
-  in_progress: number;
-  review: number;
-  done: number;
-  total: number;
-}
-
-interface ApiBoardResponse {
-  success: boolean;
-  data: {
-    board: {
-      todo: Task[];
-      in_progress: Task[];
-      review: Task[];
-      done: Task[];
-    };
-    stats: TaskStats;
-    boardSettings: {
-      columns: {
-        todo: { name: string; color: string; wipLimit: number | null };
-        in_progress: { name: string; color: string; wipLimit: number | null };
-        review: { name: string; color: string; wipLimit: number | null };
-        done: { name: string; color: string; wipLimit: number | null };
-      };
-    };
-    totalTasks: number;
-  };
-}
-
 const Board: React.FC = () => {
-  const router = useRouter();
   const queryClient = useQueryClient();
 
   const { gigInfo } = useLocalSearchParams();
@@ -100,15 +35,6 @@ const Board: React.FC = () => {
   const projectId = gig?._id;
 
   const { getToken } = useAuth(); // ✅ hook at top level
-  const [token, setToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchToken = async () => {
-      const t = await getToken();
-      setToken(t);
-    };
-    fetchToken();
-  }, [getToken]);
 
   // State for columns - will be populated from API
   const [columns, setColumns] = useState<Column[]>([
@@ -166,7 +92,7 @@ const Board: React.FC = () => {
   // Fetch project tasks - UPDATED to match your API response structure
   const fetchProjectTasks = async (): Promise<ApiBoardResponse> => {
     console.log(`Fetching board for project: ${projectId}`);
-
+    const token = await getToken();
     const response = await fetch(
       `${API_BASE_URL}/api/project/${projectId}/tasks`,
       {
@@ -334,6 +260,7 @@ const Board: React.FC = () => {
         "_id" | "id" | "createdAt" | "updatedAt" | "position"
       >
     ) => {
+      const token = await getToken();
       const response = await fetch(
         `${API_BASE_URL}/api/project/${projectId}/tasks`,
         {
@@ -377,6 +304,7 @@ const Board: React.FC = () => {
       taskId: string;
       updates: Partial<Task>;
     }) => {
+      const token = await getToken();
       const response = await fetch(
         `${API_BASE_URL}/api/project/${projectId}/tasks/${taskId}`,
         {
@@ -419,6 +347,7 @@ const Board: React.FC = () => {
       taskId: string;
       newStatus: Status;
     }) => {
+      const token = await getToken();
       const response = await fetch(
         `${API_BASE_URL}/api/project/${projectId}/tasks/${taskId}/move`,
         {
@@ -448,6 +377,7 @@ const Board: React.FC = () => {
 
   const deleteTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
+      const token = await getToken();
       const response = await fetch(
         `${API_BASE_URL}/api/project/${projectId}/tasks/${taskId}`,
         {
@@ -1031,7 +961,7 @@ const Board: React.FC = () => {
                     <Text className="text-sm font-semiBold text-gray-600 mb-1">
                       Project
                     </Text>
-                    <Text className="text-gray-900">
+                    <Text className="text-gray-900 font-semiBold">
                       {projectData?.name || "Current Project"}
                     </Text>
                   </View>
@@ -1039,7 +969,7 @@ const Board: React.FC = () => {
                     <Text className="text-sm font-semiBold text-gray-600 mb-1">
                       Due Date
                     </Text>
-                    <Text className="text-gray-900">
+                    <Text className="text-gray-900 font-semiBold">
                       {viewingTask.task.dueDate}
                     </Text>
                   </View>
@@ -1059,7 +989,7 @@ const Board: React.FC = () => {
                           ),
                         }}
                       />
-                      <Text className="text-gray-900 capitalize">
+                      <Text className="text-gray-900 font-semiBold capitalize">
                         {viewingTask.task.priority}
                       </Text>
                     </View>

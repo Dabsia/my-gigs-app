@@ -74,7 +74,6 @@ export default function RootLayout() {
               <Stack.Screen name="onboarding/payoutsuccess" />
               <Stack.Screen name="onboarding/complete" />
               <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="auth/login" />
               <Stack.Screen name="new/gigname" />
               <Stack.Screen name="new/summary" />
               <Stack.Screen name="personalgigs/personal" />

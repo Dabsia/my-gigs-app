@@ -144,18 +144,8 @@ const Clients = () => {
     });
   }, [clients, searchQuery, activeTab]);
 
-  console.log("Filtered clients:", filteredClients);
-
-  const handleTabPress = (tab: string) => {
-    setActiveTab(tab);
-  };
-
   const handleClientPress = (clientId: string) => {
     router.push(`/userprofile/client/${clientId}`);
-  };
-
-  const handleCreateClient = () => {
-    router.push("/userprofile/client/new");
   };
 
   // Listen for focus events to refresh data when screen comes into view

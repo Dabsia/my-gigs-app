@@ -15,7 +15,7 @@ interface TabIconInterface {
 
 const TabIcon: React.FC<TabIconInterface> = ({ icon, name, focused }) => {
   return (
-    <View className="flex items-center w-[150%] justify-center">
+    <View className="items-center w-[150%] justify-center">
       <View style={{ marginBottom: 4 }}>{icon}</View>
       <Text
         className={`${
@@ -41,7 +41,6 @@ export default function TabLayout() {
           height: 80,
           display: "flex",
           paddingTop: 23,
-          // top: -45,
           alignItems: "center", // Center items vertically
           justifyContent: "center", // Center items horizontally
         },

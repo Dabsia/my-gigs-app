@@ -39,8 +39,6 @@ export default function HomeScreen() {
 
   const userData = data?.user;
 
-  console.log("this is the returned data", data);
-
   const userName = {
     firstName: userData?.name?.split(" ")[0] || "User",
     lastName: userData?.name?.split(" ").slice(1).join(" ") || "",

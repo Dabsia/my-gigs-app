@@ -50,7 +50,7 @@ const LatestGigs = () => {
     isRefetching,
     isError,
   } = useQuery({
-    queryKey: ["projects-latest"],
+    queryKey: ["projects"],
     queryFn: fetchProjects,
     staleTime: 5 * 60 * 1000,
     enabled: isLoaded && isSignedIn, // CRITICAL: Only fetch when Clerk is ready AND user is authenticated
