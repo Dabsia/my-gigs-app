@@ -2,55 +2,54 @@ import HomeHeader from "@/components/HomeHeader/HomeHeader";
 import LatestGigs from "@/components/LatestGigs/LatestGigs";
 import Layout from "@/components/Layout/Layout";
 import MyStats from "@/components/MyStats/MyStats";
+import { API_BASE_URL } from "@/utils/config";
 import { useAuth } from "@clerk/clerk-expo";
+import { useQuery } from "@tanstack/react-query";
 import { ScrollView } from "react-native";
 
 export default function HomeScreen() {
   const { getToken, isSignedIn, isLoaded } = useAuth();
 
   // React Query - only runs when Clerk is loaded AND user is signed in
-  // const { data, isLoading, error } = useQuery({
-  //   queryKey: ["me"],
-  //   queryFn: async () => {
-  //     const token = await getToken();
+  const { data } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const token = await getToken();
 
-  //     if (!token) {
-  //       throw new Error("Failed to get authentication token");
-  //     }
+      if (!token) {
+        throw new Error("Failed to get authentication token");
+      }
 
-  //     const res = await fetch(`${API_BASE_URL}/api/auth`, {
-  //       headers: {
-  //         Authorization: `Bearer ${token}`,
-  //       },
-  //     });
+      const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-  //     if (!res.ok) {
-  //       const text = await res.text();
-  //       console.log("Error fetching user data:", text);
-  //       throw new Error(text);
-  //     }
+      if (!res.ok) {
+        const text = await res.text();
+        console.log("Error fetching user data:", text);
+        throw new Error(text);
+      }
 
-  //     return res.json();
-  //   },
-  //   enabled: isLoaded && isSignedIn, // Don't run query until Clerk is ready AND user is signed in
-  // });
+      return res.json();
+    },
+    enabled: isLoaded && isSignedIn, // Don't run query until Clerk is ready AND user is signed in
+  });
 
-  // Optional: Show loading state while Clerk initializes
-  // if (!isLoaded) {
-  //   return (
-  //     <Layout className="white">
-  //       <ScrollView showsVerticalScrollIndicator={false}>
-  //         <HomeHeader />
-  //         {/* You might want to add a loading skeleton here */}
-  //       </ScrollView>
-  //     </Layout>
-  //   );
-  // }
+  const userData = data?.user;
+
+  console.log("this is the returned data", data);
+
+  const userName = {
+    firstName: userData?.name?.split(" ")[0] || "User",
+    lastName: userData?.name?.split(" ").slice(1).join(" ") || "",
+  };
 
   return (
     <Layout className="white">
       <ScrollView showsVerticalScrollIndicator={false}>
-        <HomeHeader />
+        <HomeHeader userName={userName} />
         <MyStats />
         <LatestGigs />
       </ScrollView>

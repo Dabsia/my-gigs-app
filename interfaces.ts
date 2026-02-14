@@ -52,6 +52,9 @@ export interface UserData {
     lastName?: string;
     email?: string;
     name?: string;
+    address?: string;
+    profession?:string;
+    phoneNumber?:string
     // Add other user fields as needed
 }
 

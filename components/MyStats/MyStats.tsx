@@ -74,7 +74,7 @@ const MyStats = () => {
             data.message || `Failed to fetch clients (${response.status})`
           );
         }
-        console.log("Fetched clients data:", data);
+
         return data;
       } catch (error) {
         console.error("Clients fetch error:", error);
@@ -193,8 +193,6 @@ const MyStats = () => {
 
   // Error state
   const hasError = clientsError || projectsError;
-  console.log("hasError:", clientsError);
-  console.log("hasError:", projectsError);
 
   const handlePress = () => {
     if (dueGig) {

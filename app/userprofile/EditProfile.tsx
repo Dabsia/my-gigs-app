@@ -1,11 +1,12 @@
+import Avatar from "@/components/Avatar/Avatar";
 import BackBtn from "@/components/BackBtn/BackBtn";
 import Layout from "@/components/Layout/Layout";
 import PrimaryBtn from "@/components/PrimaryBtn/PrimaryBtn";
-import { getInitials } from "@/helpers/getInitials";
 import { UserData } from "@/interfaces";
 import { API_BASE_URL } from "@/utils/config";
 import { useAuth } from "@clerk/clerk-expo";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useQuery, useQueryClient } from "@tanstack/react-query"; // Add useQueryClient
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -14,26 +15,16 @@ import {
   ScrollView,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 
 export default function EditProfile() {
   const router = useRouter();
+  const queryClient = useQueryClient(); // Add this
   const [user, setUser] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const { getToken } = useAuth();
-  const [token, setToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchToken = async () => {
-      const token = await getToken();
-      setToken(token);
-    };
-    fetchToken();
-  }, [getToken]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -43,31 +34,49 @@ export default function EditProfile() {
     address: "",
   });
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
+  const { data, isLoading } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const token = await getToken();
 
-  const loadUserData = async () => {
-    try {
-      const userData = await AsyncStorage.getItem("user_data");
-
-      if (userData) {
-        const parsedUser: UserData = JSON.parse(userData);
-        setUser(parsedUser);
-
-        // Initialize form with current user data
-        setFormData({
-          name: parsedUser.name || "",
-          profession: parsedUser.profession || "",
-          phoneNumber: parsedUser.phoneNumber || "",
-          address: parsedUser.address || "",
-        });
-
-        console.log("User loaded:", parsedUser);
+      if (!token) {
+        throw new Error("Failed to get authentication token");
       }
-    } catch (error) {
-      console.error("Error loading user data:", error);
+
+      const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.log("Error fetching user data:", text);
+        throw new Error(text);
+      }
+
+      return res.json();
+    },
+  });
+
+  // Update user state and form data when data is fetched
+  useEffect(() => {
+    if (data?.user) {
+      setUser(data.user);
+      setFormData({
+        name: data.user.name || "",
+        profession: data.user.profession || "",
+        phoneNumber: data.user.phoneNumber || "",
+        address: data.user.address || "",
+      });
     }
+  }, [data]);
+
+  const userData = data?.user;
+
+  const userName = {
+    firstName: userData?.name?.split(" ")[0] || "User",
+    lastName: userData?.name?.split(" ").slice(1).join(" ") || "",
   };
 
   const validateForm = (): string[] => {
@@ -116,6 +125,14 @@ export default function EditProfile() {
 
       console.log("Attempting to update profile...");
 
+      // Get fresh token
+      const token = await getToken();
+      if (!token) {
+        Alert.alert("Error", "Authentication failed. Please log in again.");
+        setSaving(false);
+        return;
+      }
+
       // Prepare update data
       const updateData: any = {};
 
@@ -144,6 +161,7 @@ export default function EditProfile() {
 
       console.log("Sending update data:", updateData);
 
+      // MAKE THE PATCH REQUEST TO PROFILE URL
       const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
         method: "PATCH",
         headers: {
@@ -153,20 +171,20 @@ export default function EditProfile() {
         body: JSON.stringify(updateData),
       });
 
-      const data = await response.json();
+      const responseData = await response.json();
 
       console.log("Update response:", {
         status: response.status,
-        success: data.success,
-        message: data.message,
+        success: responseData.success,
+        message: responseData.message,
       });
 
-      if (response.ok && data.success) {
+      if (response.ok && responseData.success) {
         // Update local state
         const updatedUser = {
           ...user,
-          ...data.data,
-          id: data.data.id || user?.id,
+          ...responseData.data,
+          id: responseData.data.id,
         } as UserData;
 
         setUser(updatedUser);
@@ -174,19 +192,19 @@ export default function EditProfile() {
         // Update AsyncStorage
         await AsyncStorage.setItem("user_data", JSON.stringify(updatedUser));
 
-        Alert.alert("Success", "Profile updated successfully!");
+        // IMPORTANT: Invalidate the "me" query to refetch data
+        await queryClient.invalidateQueries({ queryKey: ["me"] });
 
         // Navigate back
         router.back();
       } else {
         // Handle specific error messages
-        let errorMessage = data.message || "Failed to update profile";
+        let errorMessage = responseData.message || "Failed to update profile";
 
         if (response.status === 401) {
           errorMessage = "Session expired. Please log in again.";
-          // Clear storage and redirect to login
         } else if (response.status === 400) {
-          errorMessage = data.message || "Please check your inputs";
+          errorMessage = responseData.message || "Please check your inputs";
         } else if (response.status === 500) {
           errorMessage = "Server error. Please try again later.";
         }
@@ -221,41 +239,39 @@ export default function EditProfile() {
     }));
   };
 
-  const handleCancel = () => {
-    // Reset form to original user data
-    if (user) {
-      setFormData({
-        name: user.name || "",
-        profession: user.profession || "",
-        phoneNumber: user.phoneNumber || "",
-        address: user.address || "",
-      });
-    }
-    router.back();
-  };
+  // Show loading state while fetching data
+  if (isLoading) {
+    return (
+      <Layout>
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#0000ff" />
+          <Text className="mt-4 text-gray-600">Loading profile...</Text>
+        </View>
+      </Layout>
+    );
+  }
+
+  const name = userName?.firstName + " " + userName?.lastName;
 
   return (
     <Layout>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View className="flex-row mt-3 items-center">
-          <BackBtn title="" onPress={handleCancel} />
+          <BackBtn title="" />
         </View>
 
         {/* Profile Image */}
         <View className="items-center mt-6">
-          <View className="relative">
-            <View className="w-40 h-40 rounded-full items-center justify-center bg-secondary">
-              <Text className="text-white font-textBold text-[32px]">
-                {/* Use displayName which doesn't change while typing */}
-                {getInitials(user?.name)}
-              </Text>
-            </View>
-          </View>
+          <Avatar
+            textSize="40px"
+            userName={userName}
+            className="w-40 h-40 rounded-full items-center justify-center bg-secondary"
+          />
 
           {/* Use displayName and displayProfession which remain static while typing */}
           <Text className="text-black text-2xl text-center font-semiBold mt-4">
-            {user?.name}
+            {name}
           </Text>
           <Text className="text-gray-500 text-center font-regular text-base mt-1">
             {user?.profession || "No profession set"}
@@ -322,21 +338,11 @@ export default function EditProfile() {
 
         {/* Save Button */}
         <View className="mt-10 mb-5">
-          {saving ? (
-            <TouchableOpacity
-              className="bg-primary py-4 flex-row rounded-lg items-center justify-center"
-              disabled
-            >
-              <ActivityIndicator color="white" />
-              <Text className="text-white ml-2">Saving...</Text>
-            </TouchableOpacity>
-          ) : (
-            <PrimaryBtn
-              handlePress={handleSave}
-              text="Save Changes"
-              disabled={saving}
-            />
-          )}
+          <PrimaryBtn
+            handlePress={handleSave}
+            text={saving ? "Saving..." : "Save Changes"}
+            disabled={saving}
+          />
         </View>
       </ScrollView>
     </Layout>

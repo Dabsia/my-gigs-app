@@ -1,12 +1,18 @@
-import React, { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import React from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 
+import Avatar from "@/components/Avatar/Avatar";
 import Layout from "@/components/Layout/Layout";
 import Logout from "@/components/Logout/Logout";
-import { getInitials } from "@/helpers/getInitials";
-import { UserData } from "@/interfaces";
-import { queryClient } from "@/utils/react_query";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { API_BASE_URL } from "@/utils/config";
+import { useAuth } from "@clerk/clerk-expo";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import {
   ChartLine,
@@ -16,102 +22,92 @@ import {
   Users,
 } from "lucide-react-native";
 
-export default function profile() {
+const Profile = () => {
   const router = useRouter();
-  const [user, setUser] = useState<UserData | null>(null);
+  const { getToken, isSignedIn, isLoaded } = useAuth();
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
+  console.log("isLoaded:", isLoaded);
+  console.log("isSignedIn:", isSignedIn);
 
-  const loadUserData = async () => {
-    try {
-      const userData = await AsyncStorage.getItem("user_data");
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const token = await getToken();
+      console.log("this is tokenn", token);
 
-      if (userData) {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-
-        console.log("User loaded:", parsedUser);
-      } else {
-        console.log("No user data found in storage");
+      if (!token) {
+        throw new Error("Failed to get authentication token");
       }
-    } catch (error) {
-      console.error("Error loading user data:", error);
-    } finally {
-    }
-  };
 
-  const handleLogout = async () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            // Clear React Query cache first
-            if (queryClient) {
-              queryClient.clear();
-              queryClient.removeQueries();
-            }
-
-            // Clear ALL AsyncStorage data
-            const allKeys = await AsyncStorage.getAllKeys();
-            const keysToRemove = allKeys.filter(
-              (key) =>
-                key.includes("auth") ||
-                key.includes("token") ||
-                key.includes("user") ||
-                key.includes("client") ||
-                key.includes("project") ||
-                key === "auth_token" ||
-                key === "user_data" ||
-                key === "user"
-            );
-
-            if (keysToRemove.length > 0) {
-              await AsyncStorage.multiRemove(keysToRemove);
-            }
-
-            console.log("Logged out, cleared:", keysToRemove.length, "keys");
-
-            // Force a clean navigation to login
-
-            router.replace("/auth/login");
-          } catch (error) {
-            console.error("Logout error:", error);
-            // Still navigate to login
-            router.replace("/auth/login");
-          }
+      const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      },
-    ]);
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.log("Error fetching user data:", text);
+        throw new Error(text);
+      }
+      console.log("This is res", res);
+      return res.json();
+    },
+    enabled: isLoaded && isSignedIn,
+  });
+
+  // Get user data from MongoDB response
+  const userData = data?.user;
+
+  console.log("this is the returned data", data);
+
+  const userName = {
+    firstName: userData?.name?.split(" ")[0] || "User",
+    lastName: userData?.name?.split(" ").slice(1).join(" ") || "",
   };
+
+  const name = userData?.name || "User";
+  const profession = userData?.profession || "No profession set";
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <Layout>
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#0000ff" />
+          <Text className="mt-4 text-gray-600">Loading profile...</Text>
+        </View>
+      </Layout>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Layout>
+        <View className="flex-1 items-center justify-center">
+          <Text className="text-red-500">Error loading profile</Text>
+        </View>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      {/* Header */}
-
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Avatar + Name */}
         <View className="items-center mt-6">
-          <View className="w-40 h-40 rounded-full items-center justify-center bg-secondary">
-            <Text className="text-white font-textBold text-[32px]">
-              {getInitials(user?.name)}
-            </Text>
-          </View>
+          <Avatar
+            className="w-40 h-40 rounded-full items-center justify-center bg-secondary"
+            textSize="40px"
+            userName={userName}
+          />
           <Text className="text-black text-2xl text-center font-semiBold mt-4">
-            {user?.name}
+            {name}
           </Text>
           <Text className="text-gray-500 font-regular text-center text-base mt-1">
-            {user?.profession}
+            {profession}
           </Text>
-
-          {/* Edit Profile */}
         </View>
 
         {/* Divider */}
@@ -128,21 +124,11 @@ export default function profile() {
           onRoute={() => router.push("/userprofile/EditProfile")}
         />
 
-        {/* <MenuItem
-          icon={<Settings size={22} color="#000" />}
-          onRoute={() => router.push("/userprofile/Settings")}
-          label="Settings"
-        /> */}
-
         {/* Business Management */}
         <Text className="text-gray-700 text-lg font-semiBold mt-8 mb-4">
           Business Management
         </Text>
-        {/* <MenuItem
-          onRoute={() => router.push("/userprofile/bank")}
-          icon={<Wallet size={22} color="#000" />}
-          label="Bank Information"
-        /> */}
+
         <MenuItem
           onRoute={() => router.push("/userprofile/analytics")}
           icon={<ChartLine size={22} color="#000" />}
@@ -163,7 +149,7 @@ export default function profile() {
       </ScrollView>
     </Layout>
   );
-}
+};
 
 const MenuItem = ({ icon, label, onRoute }: any) => (
   <Pressable
@@ -178,3 +164,5 @@ const MenuItem = ({ icon, label, onRoute }: any) => (
     <ChevronRight size={20} color="#9CA3AF" />
   </Pressable>
 );
+
+export default Profile;
