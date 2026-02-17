@@ -43,10 +43,10 @@ const Profile = () => {
 
       if (!res.ok) {
         const text = await res.text();
-        console.log("Error fetching user data:", text);
+
         throw new Error(text);
       }
-      console.log("This is res", res);
+
       return res.json();
     },
     enabled: isLoaded && isSignedIn,

@@ -143,6 +143,7 @@ export default function CreateProject() {
       if (data.success) {
         // Invalidate and refetch projects query
         queryClient.invalidateQueries({ queryKey: ["projects"] });
+        queryClient.invalidateQueries({ queryKey: ["client-data"] });
 
         // Also invalidate client projects if needed
         if (selectedClientId) {

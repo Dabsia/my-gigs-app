@@ -5,7 +5,7 @@ import PrimaryBtn from "@/components/PrimaryBtn/PrimaryBtn";
 import { formatDate } from "@/helpers/formatDate";
 import { API_BASE_URL } from "@/utils/config";
 import { useAuth } from "@clerk/clerk-expo";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Calendar as CalendarIcon,
@@ -26,12 +26,40 @@ import {
   View,
 } from "react-native";
 
+interface Milestone {
+  id: number;
+  title: string;
+  amount: string;
+  dueDate: Date;
+}
+
+interface ProjectData {
+  _id?: string;
+  title?: string;
+  description?: string;
+  budget?: number;
+  hourlyRate?: number;
+  format?: string;
+  startingAmount?: number;
+  dueDate?: string;
+  startDate?: string;
+  clientInfo?: {
+    _id?: string;
+    name?: string;
+  };
+  milestones?: any[];
+  [key: string]: any;
+}
+
 export default function EditProject() {
   const router = useRouter();
-
+  const queryClient = useQueryClient();
   const { gigInfo, refreshOnGoBack } = useLocalSearchParams();
+
   // Parse and use the client data passed from the previous screen
-  const gig = gigInfo ? JSON.parse(gigInfo as string) : null;
+  const gig: ProjectData | null = gigInfo
+    ? JSON.parse(gigInfo as string)
+    : null;
 
   const [showFormatDropdown, setShowFormatDropdown] = useState(false);
 
@@ -48,7 +76,7 @@ export default function EditProject() {
     if (!format) return "Milestone";
 
     // Convert from backend format to display format
-    const formatMap = {
+    const formatMap: Record<string, string> = {
       milestone: "Milestone",
       "full-project": "full-project",
       hourly: "Hourly",
@@ -75,7 +103,7 @@ export default function EditProject() {
   );
 
   // Milestone state - Initialize with existing milestones or default
-  const [milestones, setMilestones] = useState(
+  const [milestones, setMilestones] = useState<Milestone[]>(
     gig?.milestones && gig.milestones.length > 0
       ? gig.milestones.map((milestone, index) => ({
           id: Date.now() + index,
@@ -86,12 +114,14 @@ export default function EditProject() {
       : [{ id: Date.now(), title: "", amount: "", dueDate: new Date() }]
   );
 
-  const [showMilestoneDatePicker, setShowMilestoneDatePicker] = useState(null);
+  const [showMilestoneDatePicker, setShowMilestoneDatePicker] = useState<
+    number | null
+  >(null);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
 
-  const { getToken } = useAuth(); // ✅ hook at top level
+  const { getToken } = useAuth();
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
@@ -102,73 +132,16 @@ export default function EditProject() {
     fetchToken();
   }, [getToken]);
 
-  // Edit state
-  const [saving, setSaving] = useState(false);
-
   const projectFormats = ["Milestone", "full-project", "Hourly"];
 
-  const handleEditProject = async () => {
-    console.log("gigInfo", gig);
-    try {
-      setSaving(true);
+  // ============================================================================
+  // REACT QUERY MUTATION
+  // ============================================================================
 
-      if (!token) {
-        router.replace("/");
-        return;
-      }
-
-      if (!gig?._id) {
-        Alert.alert("Error", "Project ID not found");
-        setSaving(false);
-        return;
-      }
-
-      // Convert format for backend (display format to backend format)
-      const formatMap = {
-        Milestone: "milestone",
-        "full-project": "full-project",
-        Hourly: "hourly",
-      };
-
-      const backendFormat = formatMap[projectFormat] || "milestone";
-
-      // Prepare project data for API
-      const projectData: any = {
-        title: projectName,
-        description,
-        budget: parseFloat(budget) || 0,
-        hourlyRate: parseFloat(hourlyRate) || 0,
-        format: backendFormat,
-        startingAmount: parseFloat(startingAmount) || 0,
-        dueDate: date.toISOString(),
-        startDate: startDate.toISOString(),
-      };
-
-      // Add client info if exists
-      if (gig?.clientInfo?._id) {
-        projectData.clientId = gig.clientInfo._id;
-      }
-
-      // Add milestones only if format is Milestone
-      if (projectFormat === "Milestone") {
-        projectData.milestones = milestones
-          .filter((m) => m.title.trim() && m.amount)
-          .map((m) => ({
-            title: m.title.trim(),
-            amount: parseFloat(m.amount) || 0,
-            dueDate: m.dueDate.toISOString(),
-          }));
-
-        // If no valid milestones, don't send empty array
-        if (projectData.milestones.length === 0) {
-          delete projectData.milestones;
-        }
-      } else {
-        // Clear milestones if not milestone format
-        projectData.milestones = [];
-      }
-
-      console.log("Updating project with data:", projectData);
+  const updateProjectMutation = useMutation({
+    mutationFn: async (projectData: any) => {
+      if (!token) throw new Error("No auth token");
+      if (!gig?._id) throw new Error("Project ID not found");
 
       const response = await fetch(`${API_BASE_URL}/api/project/${gig._id}`, {
         method: "PATCH",
@@ -180,67 +153,156 @@ export default function EditProject() {
       });
 
       const data = await response.json();
-      console.log("Update Response:", data);
 
-      if (response.ok && data.success) {
-        Alert.alert("Success", "Project updated successfully!");
-
-        // If refreshOnGoBack flag is set, navigate back with fresh data
-        if (refreshOnGoBack === "true") {
-          console.log("Navigating back with fresh data...");
-          router.replace({
-            pathname: "/giginfo/giginformation",
-            params: {
-              gigInfo: JSON.stringify(data.data),
-            },
-          });
-        } else {
-          // Otherwise just go back
-          router.back();
-        }
-      } else {
-        let errorMessage = data.message || "Failed to update project";
-
+      if (!response.ok) {
+        // Handle specific error cases
         if (response.status === 401) {
-          errorMessage = "Session expired. Please log in again.";
           await AsyncStorage.clear();
           router.replace("/");
-        } else if (response.status === 400) {
-          // Show specific validation errors if available
-          if (data.errors && Array.isArray(data.errors)) {
-            errorMessage = data.errors
-              .map((err) => err.message || err)
-              .join("\n");
-          } else if (data.error) {
-            errorMessage = data.error;
-          }
+          throw new Error("Session expired. Please log in again.");
         } else if (response.status === 404) {
-          errorMessage = "Project not found";
+          throw new Error("Project not found");
+        } else if (response.status === 400) {
+          if (data.errors && Array.isArray(data.errors)) {
+            throw new Error(
+              data.errors.map((err: any) => err.message || err).join("\n")
+            );
+          } else if (data.error) {
+            throw new Error(data.error);
+          }
         } else if (response.status === 500) {
-          errorMessage = "Server error. Please try again later.";
+          throw new Error("Server error. Please try again later.");
         }
-
-        Alert.alert("Update Failed", errorMessage);
-      }
-    } catch (error: any) {
-      console.error("Save error:", error);
-
-      let errorMessage = "Failed to update project";
-
-      if (error.message) {
-        if (error.message.includes("Network request failed")) {
-          errorMessage = "Network error. Please check your connection.";
-        } else if (error.message.includes("JSON")) {
-          errorMessage = "Invalid response from server";
-        } else {
-          errorMessage = error.message;
-        }
+        throw new Error(data.message || "Failed to update project");
       }
 
-      Alert.alert("Error", errorMessage);
-    } finally {
-      setSaving(false);
+      if (!data.success) {
+        throw new Error(data.message || "Failed to update project");
+      }
+
+      return data;
+    },
+    onSuccess: (data) => {
+      Alert.alert("Success", "Project updated successfully!");
+
+      // ============================================================================
+      // INVALIDATE ALL RELATED QUERIES
+      // ============================================================================
+
+      // 1. Invalidate the specific project query
+      queryClient.invalidateQueries({
+        queryKey: ["project", gig?._id],
+      });
+
+      // 2. Invalidate all projects list queries (for dashboard, etc.)
+      queryClient.invalidateQueries({
+        queryKey: ["projects"],
+      });
+
+      // 3. Invalidate client-specific projects if this project has a client
+      if (gig?.clientInfo?._id) {
+        queryClient.invalidateQueries({
+          queryKey: ["client-data", gig.clientInfo._id],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["client-projects", gig.clientInfo._id],
+        });
+      }
+
+      // 4. Invalidate any stats queries
+      queryClient.invalidateQueries({
+        queryKey: ["project-stats"],
+      });
+
+      // 5. Also invalidate by partial key matches (optional but thorough)
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0] as string;
+          return key.includes("project") || key.includes("client");
+        },
+      });
+
+      // Navigate back with fresh data if needed
+      if (refreshOnGoBack === "true") {
+        console.log("Navigating back with fresh data...");
+        router.replace({
+          pathname: "/giginfo/giginformation",
+          params: {
+            gigInfo: JSON.stringify(data.data),
+          },
+        });
+      } else {
+        router.back();
+      }
+    },
+    onError: (error: Error) => {
+      console.error("Update error:", error);
+      Alert.alert("Update Failed", error.message);
+    },
+  });
+
+  const handleEditProject = async () => {
+    console.log("gigInfo", gig);
+
+    if (!token) {
+      router.replace("/");
+      return;
     }
+
+    if (!gig?._id) {
+      Alert.alert("Error", "Project ID not found");
+      return;
+    }
+
+    // Convert format for backend (display format to backend format)
+    const formatMap: Record<string, string> = {
+      Milestone: "milestone",
+      "full-project": "full-project",
+      Hourly: "hourly",
+    };
+
+    const backendFormat = formatMap[projectFormat] || "milestone";
+
+    // Prepare project data for API
+    const projectData: any = {
+      title: projectName,
+      description,
+      budget: parseFloat(budget) || 0,
+      hourlyRate: parseFloat(hourlyRate) || 0,
+      format: backendFormat,
+      startingAmount: parseFloat(startingAmount) || 0,
+      dueDate: date.toISOString(),
+      startDate: startDate.toISOString(),
+    };
+
+    // Add client info if exists
+    if (gig?.clientInfo?._id) {
+      projectData.clientId = gig.clientInfo._id;
+    }
+
+    // Add milestones only if format is Milestone
+    if (projectFormat === "Milestone") {
+      projectData.milestones = milestones
+        .filter((m) => m.title.trim() && m.amount)
+        .map((m) => ({
+          title: m.title.trim(),
+          amount: parseFloat(m.amount) || 0,
+          dueDate: m.dueDate.toISOString(),
+        }));
+
+      // If no valid milestones, don't send empty array
+      if (projectData.milestones.length === 0) {
+        delete projectData.milestones;
+      }
+    } else {
+      // Clear milestones if not milestone format
+      projectData.milestones = [];
+    }
+
+    console.log("Updating project with data:", projectData);
+
+    // Execute the mutation
+    updateProjectMutation.mutate(projectData);
   };
 
   const handleFormatChange = (format: string) => {
@@ -255,14 +317,14 @@ export default function EditProject() {
     }
   };
 
-  const onDateConfirm = (params) => {
+  const onDateConfirm = (params: any) => {
     setShowDatePicker(false);
     if (params.date) {
       setDate(params.date);
     }
   };
 
-  const onStartDateConfirm = (params) => {
+  const onStartDateConfirm = (params: any) => {
     setShowStartDatePicker(false);
     if (params.date) {
       setStartDate(params.date);
@@ -282,7 +344,7 @@ export default function EditProject() {
     ]);
   };
 
-  const removeMilestone = (id) => {
+  const removeMilestone = (id: number) => {
     if (milestones.length > 1) {
       setMilestones(milestones.filter((milestone) => milestone.id !== id));
     } else {
@@ -290,7 +352,11 @@ export default function EditProject() {
     }
   };
 
-  const updateMilestone = (id, field, value) => {
+  const updateMilestone = (
+    id: number,
+    field: keyof Milestone,
+    value: string | Date
+  ) => {
     setMilestones(
       milestones.map((milestone) =>
         milestone.id === id ? { ...milestone, [field]: value } : milestone
@@ -298,7 +364,7 @@ export default function EditProject() {
     );
   };
 
-  const onMilestoneDateConfirm = (params) => {
+  const onMilestoneDateConfirm = (params: any) => {
     const milestoneId = showMilestoneDatePicker;
     setShowMilestoneDatePicker(null);
 
@@ -315,8 +381,10 @@ export default function EditProject() {
   };
 
   const handleCancel = () => {
-    router.back();
+    router.push("/giginfo/giginformation");
   };
+
+  const isLoading = updateProjectMutation.isPending;
 
   return (
     <Layout>
@@ -341,7 +409,7 @@ export default function EditProject() {
               value={projectName}
               onChangeText={setProjectName}
               className="w-full px-4 py-4 font-regular border border-gray-300 rounded-xl bg-white text-base text-gray-900"
-              editable={!saving}
+              editable={!isLoading}
             />
           </View>
 
@@ -365,7 +433,7 @@ export default function EditProject() {
             <TouchableOpacity
               className="flex-1 px-4 py-4 border border-gray-300 rounded-xl bg-white flex-row items-center justify-between active:bg-gray-50"
               onPress={() => setShowStartDatePicker(true)}
-              disabled={saving}
+              disabled={isLoading}
             >
               <Text className="text-base font-regular text-gray-900">
                 {formatDate(startDate)}
@@ -382,7 +450,7 @@ export default function EditProject() {
             <TouchableOpacity
               className="flex-1 px-4 py-4 border border-gray-300 rounded-xl bg-white flex-row items-center justify-between active:bg-gray-50"
               onPress={() => setShowDatePicker(true)}
-              disabled={saving}
+              disabled={isLoading}
             >
               <Text className="text-base font-regular text-gray-900">
                 {formatDate(date)}
@@ -410,7 +478,7 @@ export default function EditProject() {
                     onChangeText={setBudget}
                     className="flex-1 ml-2 text-base font-regular text-gray-900"
                     keyboardType="numeric"
-                    editable={!saving}
+                    editable={!isLoading}
                   />
                 </View>
               </View>
@@ -427,7 +495,7 @@ export default function EditProject() {
                 onChangeText={setHourlyRate}
                 className="w-full px-4 py-4 font-regular border border-gray-300 rounded-xl bg-white text-base text-gray-900"
                 keyboardType="numeric"
-                editable={!saving}
+                editable={!isLoading}
               />
             </View>
 
@@ -439,7 +507,7 @@ export default function EditProject() {
               <TouchableOpacity
                 className="w-full px-4 py-4 border border-gray-300 rounded-xl bg-white flex-row items-center justify-between active:bg-gray-50"
                 onPress={() => setShowFormatDropdown(true)}
-                disabled={saving}
+                disabled={isLoading}
               >
                 <Text className="text-base font-regular text-gray-900">
                   {projectFormat}
@@ -461,7 +529,7 @@ export default function EditProject() {
                 onChangeText={setStartingAmount}
                 className="w-full px-4 py-4 font-regular border border-gray-300 rounded-xl bg-white text-base text-gray-900"
                 keyboardType="numeric"
-                editable={!saving}
+                editable={!isLoading}
               />
             </View>
 
@@ -475,7 +543,7 @@ export default function EditProject() {
                   <TouchableOpacity
                     className="flex-row items-center"
                     onPress={addMilestone}
-                    disabled={saving}
+                    disabled={isLoading}
                   >
                     <Plus size={20} color="#3B82F6" />
                     <Text className="text-primary font-semiBold ml-1">
@@ -497,7 +565,7 @@ export default function EditProject() {
                         <TouchableOpacity
                           onPress={() => removeMilestone(milestone.id)}
                           className="p-1"
-                          disabled={saving}
+                          disabled={isLoading}
                         >
                           <X size={20} color="#EF4444" />
                         </TouchableOpacity>
@@ -517,7 +585,7 @@ export default function EditProject() {
                           updateMilestone(milestone.id, "title", text)
                         }
                         className="w-full px-4 py-3 font-regular border border-gray-300 rounded-lg bg-white text-base text-gray-900"
-                        editable={!saving}
+                        editable={!isLoading}
                       />
                     </View>
 
@@ -539,7 +607,7 @@ export default function EditProject() {
                           }
                           className="flex-1 px-4 py-3 font-regular border border-gray-300 rounded-lg bg-white text-base text-gray-900"
                           keyboardType="numeric"
-                          editable={!saving}
+                          editable={!isLoading}
                         />
                       </View>
                     </View>
@@ -552,7 +620,7 @@ export default function EditProject() {
                       <TouchableOpacity
                         className="flex-row items-center justify-between px-4 py-3 border border-gray-300 rounded-lg bg-white"
                         onPress={() => setShowMilestoneDatePicker(milestone.id)}
-                        disabled={saving}
+                        disabled={isLoading}
                       >
                         <Text className="text-base font-regular text-gray-900">
                           {formatDate(milestone.dueDate)}
@@ -591,13 +659,13 @@ export default function EditProject() {
                 className="w-full px-4 py-4 border font-regular border-gray-300 rounded-xl bg-white text-base text-gray-900 min-h-[120px]"
                 multiline
                 textAlignVertical="top"
-                editable={!saving}
+                editable={!isLoading}
               />
             </View>
           </View>
 
-          {/* Edit Project Button */}
-          {saving ? (
+          {/* Update Project Button */}
+          {isLoading ? (
             <TouchableOpacity
               className="bg-primary py-4 flex-row rounded-lg items-center justify-center"
               disabled
@@ -611,7 +679,7 @@ export default function EditProject() {
             <PrimaryBtn
               text="Update Project Information"
               handlePress={handleEditProject}
-              disabled={saving}
+              disabled={isLoading}
             />
           )}
         </ScrollView>
@@ -635,7 +703,7 @@ export default function EditProject() {
                   key={format}
                   className="py-4 px-2 border-b border-gray-200 last:border-b-0 active:bg-gray-50"
                   onPress={() => handleFormatChange(format)}
-                  disabled={saving}
+                  disabled={isLoading}
                 >
                   <Text className="text-base font-regular text-center text-gray-900">
                     {format}

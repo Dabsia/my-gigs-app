@@ -38,6 +38,8 @@ const getClientColor = (clientName: string): string => {
 const GigCard = ({ item }: { item: ProjectInterface }) => {
   const router = useRouter();
 
+  console.log("item", item);
+
   const handlePress = () => {
     router.push({
       pathname: "/giginfo/personalgiginfo",

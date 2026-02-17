@@ -45,6 +45,7 @@ const DeleteProjectModal = ({
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["client-projects"] });
       queryClient.invalidateQueries({ queryKey: ["gigs"] });
+      queryClient.invalidateQueries({ queryKey: ["client-data"] });
 
       closeModal();
       router.back();

@@ -28,7 +28,7 @@ export default function HomeScreen() {
 
       if (!res.ok) {
         const text = await res.text();
-        console.log("Error fetching user data:", text);
+
         throw new Error(text);
       }
 

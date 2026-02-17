@@ -2,17 +2,11 @@ import BackBtn from "@/components/BackBtn/BackBtn";
 import CreateNewGig from "@/components/CreateNewGig/CreateNewGig";
 import GigCard from "@/components/GigCard/GigCard";
 import Layout from "@/components/Layout/Layout";
-import {
-  Client,
-  ClientStats,
-  Project,
-  TabType,
-  TransformedGig,
-} from "@/interfaces";
+import { Client, ClientStats, Project, TabType } from "@/interfaces";
 import { API_BASE_URL } from "@/utils/config";
 import { useAuth } from "@clerk/clerk-expo";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Pencil, Trash } from "lucide-react-native";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -26,75 +20,69 @@ import {
   View,
 } from "react-native";
 
-interface ClientResponse {
-  success: boolean;
-  data: Client;
-}
+// ============================================================================
+// INTERFACES
+// ============================================================================
 
-interface ProjectsResponse {
+interface ClientProjectsResponse {
   success: boolean;
+  client: {
+    id: string;
+    name: string;
+    company: string;
+    email: string;
+    phone: string;
+  };
+  stats: {
+    total: number;
+    active: number;
+    completed: number;
+    overdue: number;
+    totalRevenue: number;
+    totalPaid: number;
+  };
+  count: number;
+  total: number;
+  page: number;
+  pages: number;
   data: Project[];
 }
 
-const transformProjectToGig = (
-  project: Project,
-  currentClient: Client
-): TransformedGig => {
-  let clientName =
-    project.client?.name ||
-    (typeof project.clientId === "object" && project.clientId.name) ||
-    currentClient.name;
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
-  const dueDate = project.dueDate ? new Date(project.dueDate) : null;
-  const displayDate = dueDate
-    ? dueDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : new Date(
-        project.createdAt || project.updatedAt || Date.now()
-      ).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
+const calculateClientStats = (projects: any[]): ClientStats => {
+  const activeProjects = projects.filter(
+    (project) =>
+      project.status === "in_progress" || project.status === "not_started"
+  ).length;
 
-  const isOverdue = dueDate ? dueDate < new Date() : false;
+  const completedProjects = projects.filter(
+    (project) => project.status === "completed"
+  ).length;
+
+  const overdueProjects = projects.filter((project) => {
+    const dueDate = project.dueDate ? new Date(project.dueDate) : null;
+    const isOverdue = dueDate ? dueDate < new Date() : false;
+    return (
+      isOverdue &&
+      project.status !== "completed" &&
+      project.status !== "archived"
+    );
+  }).length;
+
+  const totalRevenue = projects.reduce(
+    (sum, project) => sum + (project.totalAmount || 0),
+    0
+  );
+  const totalPaid = projects.reduce(
+    (sum, project) => sum + (project.amountPaid || 0),
+    0
+  );
 
   return {
-    id: project._id,
-    name: project.title || project.name || "Untitled Project",
-    date: displayDate,
-    percent: project.progressPercentage || project.progress || 0,
-    gigType: project.format || project.type || "personal",
-    status: project.status || "active",
-    isOverdue,
-    totalAmount: project.totalAmount || 0,
-    amountPaid: project.amountPaid || 0,
-    client: { name: clientName },
-  };
-};
-
-const calculateClientStats = (gigs: TransformedGig[]): ClientStats => {
-  const activeProjects = gigs.filter(
-    (gig) => gig.status === "in_progress" || gig.status === "not_started"
-  ).length;
-
-  const completedProjects = gigs.filter(
-    (gig) => gig.status === "completed"
-  ).length;
-
-  const overdueProjects = gigs.filter(
-    (gig) =>
-      gig.isOverdue && gig.status !== "completed" && gig.status !== "archived"
-  ).length;
-
-  const totalRevenue = gigs.reduce((sum, gig) => sum + gig.totalAmount, 0);
-  const totalPaid = gigs.reduce((sum, gig) => sum + gig.amountPaid, 0);
-
-  return {
-    totalProjects: gigs.length,
+    totalProjects: projects.length,
     activeProjects,
     completedProjects,
     overdueProjects,
@@ -102,6 +90,10 @@ const calculateClientStats = (gigs: TransformedGig[]): ClientStats => {
     totalPaid,
   };
 };
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export default function ClientProfile() {
   const { id } = useLocalSearchParams();
@@ -111,14 +103,18 @@ export default function ClientProfile() {
   const { getToken } = useAuth();
 
   // ============================================================================
-  // API FUNCTIONS
+  // API FUNCTION - Get client details and projects in one call
   // ============================================================================
 
-  const fetchClientDetails = async (): Promise<Client> => {
+  const fetchClientData = async (): Promise<{
+    client: Client;
+    projects: Project[];
+    stats: ClientStats;
+  }> => {
     const token = await getToken();
     if (!token) throw new Error("No auth token");
 
-    const response = await fetch(`${API_BASE_URL}/api/projects/client/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/project/client/${id}`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -126,58 +122,62 @@ export default function ClientProfile() {
       },
     });
 
-    console.log("res", response);
-
-    const data: ClientResponse = await response.json();
+    const data: ClientProjectsResponse = await response.json();
 
     if (!response.ok) {
       throw new Error(
-        data.message || `Failed to fetch client (${response.status})`
+        data.message || `Failed to fetch client data (${response.status})`
       );
     }
 
     if (!data.success) {
-      throw new Error(data.message || "Failed to fetch client");
+      throw new Error(data.message || "Failed to fetch client data");
     }
 
-    return data.data;
+    // Transform the client data from the response
+    const client: Client = {
+      id: data.client.id,
+      _id: data.client.id,
+      name: data.client.name,
+      company: data.client.company || "",
+      email: data.client.email || "",
+      phone: data.client.phone || "",
+      status: "active",
+      hasOverdue: data.stats.overdue > 0,
+      initials: data.client.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .substring(0, 2),
+    };
+
+    // Transform stats
+    const stats: ClientStats = {
+      totalProjects: data.stats.total,
+      activeProjects: data.stats.active,
+      completedProjects: data.stats.completed,
+      overdueProjects: data.stats.overdue,
+      totalRevenue: data.stats.totalRevenue,
+      totalPaid: data.stats.totalPaid,
+    };
+
+    return {
+      client,
+      projects: data.data,
+      stats,
+    };
   };
 
-  const fetchClientProjects = async (): Promise<Project[]> => {
-    const token = await getToken();
-    if (!token) throw new Error("No auth token");
-
-    const response = await fetch(
-      `${API_BASE_URL}/api/projects/client/${id}/projects`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const data: ProjectsResponse = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.message || `Failed to fetch client projects (${response.status})`
-      );
-    }
-
-    if (!data.success) {
-      throw new Error(data.message || "Failed to fetch client projects");
-    }
-    console.log("ffetchedCliients", data);
-    return data.data;
-  };
+  // ============================================================================
+  // DELETE CLIENT FUNCTION
+  // ============================================================================
 
   const deleteClient = async (): Promise<void> => {
     const token = await getToken();
     if (!token) throw new Error("No auth token");
 
-    const response = await fetch(`${API_BASE_URL}/api/projects/client/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/clients/${id}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -202,26 +202,9 @@ export default function ClientProfile() {
   // REACT QUERY HOOKS
   // ============================================================================
 
-  const {
-    data: clientData,
-    isLoading: isLoadingClient,
-    error: clientError,
-    refetch: refetchClient,
-  } = useQuery<Client>({
-    queryKey: ["client", id],
-    queryFn: fetchClientDetails,
-    enabled: !!id,
-  });
-
-  const {
-    data: projects = [],
-    isLoading: isLoadingProjects,
-    error: projectsError,
-    refetch: refetchProjects,
-    isRefetching,
-  } = useQuery<Project[]>({
-    queryKey: ["client-projects", id],
-    queryFn: fetchClientProjects,
+  const { data, isLoading, error, refetch, isRefetching } = useQuery({
+    queryKey: ["client-data", id],
+    queryFn: fetchClientData,
     enabled: !!id,
   });
 
@@ -229,8 +212,8 @@ export default function ClientProfile() {
     mutationFn: deleteClient,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-      queryClient.invalidateQueries({ queryKey: ["client", id] });
-      queryClient.invalidateQueries({ queryKey: ["client-projects", id] });
+      queryClient.invalidateQueries({ queryKey: ["client-data", id] });
+
       Alert.alert("Success", "Client deleted successfully");
       router.back();
     },
@@ -240,13 +223,24 @@ export default function ClientProfile() {
   });
 
   // ============================================================================
+  // HANDLER FOR REFRESHING AFTER PROJECT CREATION
+  // ============================================================================
+
+  const handleProjectCreated = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: ["client-data", id],
+    });
+  }, [queryClient, id]);
+
+  // ============================================================================
   // COMPUTED VALUES
   // ============================================================================
 
   const currentClient = useMemo<Client>(() => {
     return (
-      clientData || {
+      data?.client || {
         id: id as string,
+        _id: id as string,
         name: "Unknown Client",
         company: "Unknown Company",
         email: "",
@@ -256,58 +250,123 @@ export default function ClientProfile() {
         initials: "UC",
       }
     );
-  }, [clientData, id]);
+  }, [data, id]);
 
-  const allGigs = useMemo<TransformedGig[]>(() => {
-    if (!projects || !Array.isArray(projects)) return [];
-    return projects.map((p: Project) =>
-      transformProjectToGig(p, currentClient)
-    );
-  }, [projects, currentClient]);
+  // Enhanced projects with computed fields for display
+  const enhancedProjects = useMemo<any[]>(() => {
+    if (!data?.projects || !Array.isArray(data.projects)) return [];
 
-  const filteredGigs = useMemo<TransformedGig[]>(() => {
+    return data.projects.map((project) => {
+      // Calculate days remaining
+      const dueDate = project.dueDate ? new Date(project.dueDate) : null;
+      const daysRemaining = dueDate
+        ? Math.ceil(
+            (dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+          )
+        : 0;
+
+      // Check if overdue
+      const isOverdue = dueDate ? dueDate < new Date() : false;
+
+      // Create display date
+      const displayDate = dueDate
+        ? dueDate.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })
+        : new Date(
+            project.createdAt || project.updatedAt || Date.now()
+          ).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          });
+
+      // Calculate remaining amount
+      const remainingAmount =
+        (project.totalAmount || 0) - (project.amountPaid || 0);
+
+      // Ensure client object exists in the format GigCard expects
+      const clientObject = project.client || {
+        id: currentClient.id || currentClient._id,
+        name: currentClient.name,
+        email: currentClient.email,
+        phone: currentClient.phone,
+        company: currentClient.company,
+        address: (project as any).clientInfo?.address || "",
+      };
+
+      // Return the full project with all original data plus computed fields
+      return {
+        ...project,
+        // Add computed fields
+        date: displayDate,
+        isOverdue,
+        daysRemaining,
+        remainingAmount,
+        // Ensure client is properly set
+        client: clientObject,
+        // Ensure id is available (some components might use id, some might use _id)
+        id: project._id,
+      };
+    });
+  }, [data?.projects, currentClient]);
+
+  // Filter projects based on active tab
+  const filteredProjects = useMemo<any[]>(() => {
     switch (activeTab) {
       case "active":
-        return allGigs.filter(
-          (g) => g.status === "in_progress" || g.status === "not_started"
+        return enhancedProjects.filter(
+          (p) => p.status === "in_progress" || p.status === "not_started"
         );
       case "overdue":
-        return allGigs.filter(
-          (g) =>
-            g.isOverdue && g.status !== "completed" && g.status !== "archived"
+        return enhancedProjects.filter(
+          (p) =>
+            p.isOverdue && p.status !== "completed" && p.status !== "archived"
         );
       default:
-        return allGigs;
+        return enhancedProjects;
     }
-  }, [allGigs, activeTab]);
+  }, [enhancedProjects, activeTab]);
 
+  // Tab statistics
   const tabStats = useMemo(() => {
     return {
-      all: allGigs.length,
-      active: allGigs.filter(
-        (g) => g.status === "in_progress" || g.status === "not_started"
+      all: enhancedProjects.length,
+      active: enhancedProjects.filter(
+        (p) => p.status === "in_progress" || p.status === "not_started"
       ).length,
-      overdue: allGigs.filter(
-        (g) =>
-          g.isOverdue && g.status !== "completed" && g.status !== "archived"
+      overdue: enhancedProjects.filter(
+        (p) =>
+          p.isOverdue && p.status !== "completed" && p.status !== "archived"
       ).length,
     };
-  }, [allGigs]);
+  }, [enhancedProjects]);
 
-  const clientStats = useMemo(() => calculateClientStats(allGigs), [allGigs]);
+  // Client statistics
+  const clientStats = useMemo<ClientStats>(() => {
+    if (data?.stats) {
+      return data.stats;
+    }
+    return calculateClientStats(enhancedProjects);
+  }, [data?.stats, enhancedProjects]);
+
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
 
   const onRefresh = useCallback(() => {
-    refetchClient();
-    refetchProjects();
-  }, [refetchClient, refetchProjects]);
+    refetch();
+  }, [refetch]);
 
   const handleTabPress = useCallback((tab: TabType) => setActiveTab(tab), []);
 
   const handleDeleteClient = useCallback(async () => {
-    if (allGigs.length > 0) {
+    if (enhancedProjects.length > 0) {
       Alert.alert(
         "Cannot Delete Client",
-        `This client has ${allGigs.length} project(s). Delete or reassign projects first.`,
+        `This client has ${enhancedProjects.length} project(s). Delete or reassign projects first.`,
         [{ text: "OK", style: "default" }]
       );
       return;
@@ -325,13 +384,24 @@ export default function ClientProfile() {
         },
       ]
     );
-  }, [allGigs.length, currentClient.name, deleteClientMutation]);
+  }, [enhancedProjects.length, currentClient.name, deleteClientMutation]);
 
-  const renderGigItem = useCallback(
-    ({ item }: { item: TransformedGig }) => <GigCard item={item} />,
-    []
-  );
-  const keyExtractor = useCallback((item: TransformedGig) => item.id, []);
+  const handleEditClient = useCallback(() => {
+    router.push({
+      pathname: "/userprofile/client/edit/",
+      params: { client: JSON.stringify(currentClient) },
+    });
+  }, [currentClient, router]);
+
+  // ============================================================================
+  // RENDER HELPERS
+  // ============================================================================
+
+  const renderGigItem = useCallback(({ item }: { item: any }) => {
+    return <GigCard item={item} />;
+  }, []);
+
+  const keyExtractor = useCallback((item: any) => item._id || item.id, []);
 
   const renderEmptyState = useCallback(() => {
     const emptyStates = {
@@ -353,21 +423,24 @@ export default function ClientProfile() {
     };
     const { title, message, showButton } = emptyStates[activeTab];
 
+    useFocusEffect(
+      useCallback(() => {
+        // Refetch data when the screen comes into focus
+        refetch();
+      }, [refetch])
+    );
+
     return (
       <View className="py-12 items-center px-4">
         <View className="w-24 h-24 bg-gray-100 rounded-full items-center justify-center mb-4">
           <Text className="text-gray-400 text-3xl">📂</Text>
         </View>
-        <Text className="text-gray-700 font-bold text-lg mb-2">{title}</Text>
-        <Text className="text-gray-500 text-center mb-6">{message}</Text>
-        {showButton && (
-          <TouchableOpacity
-            onPress={() => router.push(`/new/gigname?clientId=${id}`)}
-            className="bg-primary py-3 px-6 rounded-lg"
-          >
-            <Text className="text-white font-bold">Create New Project</Text>
-          </TouchableOpacity>
-        )}
+        <Text className="text-gray-700 font-semiBold text-lg mb-2">
+          {title}
+        </Text>
+        <Text className="text-gray-500 text-center font-aeonikRegular mb-6">
+          {message}
+        </Text>
       </View>
     );
   }, [activeTab, id, router]);
@@ -376,24 +449,21 @@ export default function ClientProfile() {
   // LOADING STATES
   // ============================================================================
 
-  if (isLoadingClient || isLoadingProjects) {
+  if (isLoading) {
     return (
       <Layout>
         <View className="flex-1 justify-center items-center py-8">
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text className="mt-4 text-gray-600">Loading client projects...</Text>
+          <Text className="mt-4 text-gray-600">Loading client data...</Text>
         </View>
       </Layout>
     );
   }
 
-  console.log("clientError", clientError);
-  console.log("projectError", projectsError);
-
-  if (clientError || projectsError) {
-    const errorMessage =
-      clientError?.message || projectsError?.message || "An error occurred";
-    const is404 = errorMessage.includes("404");
+  if (error) {
+    const errorMessage = error.message || "An error occurred";
+    const is404 =
+      errorMessage.includes("404") || errorMessage.includes("not found");
 
     return (
       <Layout>
@@ -416,8 +486,8 @@ export default function ClientProfile() {
               } text-center mb-4`}
             >
               {is404
-                ? errorMessage
-                : "This client doesn't exist or has been deleted."}
+                ? "This client doesn't exist or has been deleted."
+                : errorMessage}
             </Text>
             <TouchableOpacity
               onPress={is404 ? () => router.back() : onRefresh}
@@ -439,6 +509,10 @@ export default function ClientProfile() {
     );
   }
 
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
+
   return (
     <Layout>
       <View className="flex-1">
@@ -446,15 +520,7 @@ export default function ClientProfile() {
         <View className="my-3 flex-row justify-between items-center">
           <BackBtn title={currentClient.name} />
           <View className="flex-row">
-            <Pressable
-              className="mr-4"
-              onPress={() =>
-                router.push({
-                  pathname: "/userprofile/client/edit/",
-                  params: { client: JSON.stringify(currentClient) },
-                })
-              }
-            >
+            <Pressable className="mr-4" onPress={handleEditClient}>
               <Pencil fill="#061D3F" size={25} color="#061D3F" />
             </Pressable>
             <Pressable
@@ -481,7 +547,7 @@ export default function ClientProfile() {
                 {currentClient.company || "No company specified"}
               </Text>
             </View>
-            <View className="flex-1">
+            <View className="flex-1 ml-4">
               <Text className="text-gray-500 text-sm font-regular">Email</Text>
               <Text className="text-gray-900 font-semiBold text-base mt-1">
                 {currentClient.email || "No email"}
@@ -533,13 +599,21 @@ export default function ClientProfile() {
                 Financial Summary
               </Text>
               <View className="flex-row justify-between">
-                <Text className="text-gray-700 text-sm font-medium">
+                <Text className="text-gray-700 text-sm font-aeonikRegular">
                   Total Revenue: ${clientStats.totalRevenue.toLocaleString()}
                 </Text>
-                <Text className="text-green-600 text-sm font-medium">
+                <Text className="text-green-600 text-sm font-aeonikRegular">
                   Paid: ${clientStats.totalPaid.toLocaleString()}
                 </Text>
               </View>
+              {clientStats.totalRevenue - clientStats.totalPaid > 0 && (
+                <Text className="text-red-600 text-sm font-aeonikRegular mt-1">
+                  Outstanding: $
+                  {(
+                    clientStats.totalRevenue - clientStats.totalPaid
+                  ).toLocaleString()}
+                </Text>
+              )}
             </View>
           )}
         </View>
@@ -594,11 +668,15 @@ export default function ClientProfile() {
 
         {/* Projects List */}
         <FlatList
-          data={filteredGigs}
+          data={filteredProjects}
           renderItem={renderGigItem}
           keyExtractor={keyExtractor}
           ListEmptyComponent={renderEmptyState}
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 16 }}
+          contentContainerStyle={{
+            paddingTop: 16,
+            paddingBottom: 80,
+            flexGrow: 1,
+          }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -611,7 +689,11 @@ export default function ClientProfile() {
         />
 
         {/* Create New Project Button */}
-        <CreateNewGig location="new/gigname" clientData={currentClient} />
+        <CreateNewGig
+          location="new/gigname"
+          clientData={currentClient}
+          onSuccess={handleProjectCreated}
+        />
       </View>
     </Layout>
   );

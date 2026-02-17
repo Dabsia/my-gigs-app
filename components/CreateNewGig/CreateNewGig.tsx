@@ -1,7 +1,7 @@
 // components/CreateNewGig/CreateNewGig.tsx
-import { View, Text, Pressable } from "react-native";
-import React from "react";
 import { useRouter } from "expo-router";
+import React from "react";
+import { Pressable, Text } from "react-native";
 
 // Define a more flexible interface
 interface ClientData {
@@ -20,7 +20,8 @@ interface ClientData {
 
 interface CreateNewGigProps {
   location: string;
-  clientData?: ClientData; // Optional client data
+  clientData?: ClientData;
+  onSuccess?: () => void;
 }
 
 const CreateNewGig = ({ location, clientData }: CreateNewGigProps) => {
@@ -34,9 +35,6 @@ const CreateNewGig = ({ location, clientData }: CreateNewGigProps) => {
       const clientId = clientData._id || clientData.id;
       const clientName = clientData.name || "";
 
-      console.log("Client ID to send:", clientId);
-      console.log("Full client data:", clientData);
-
       // Create params object - match what the receiving page expects
       const params: Record<string, string> = {
         clientId: clientId || "",
@@ -45,14 +43,11 @@ const CreateNewGig = ({ location, clientData }: CreateNewGigProps) => {
         client: JSON.stringify(clientData), // Use 'client' key if that's what the receiving page expects
       };
 
-      console.log("Navigation params:", params);
-
       router.push({
         pathname: `/${location}`,
         params: params,
       });
     } else {
-      console.log("No client data, navigating without params");
       router.push(`/${location}`);
     }
   };
