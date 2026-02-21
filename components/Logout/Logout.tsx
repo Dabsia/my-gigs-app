@@ -12,9 +12,10 @@ const Logout = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
-      // Redirect to your desired page
-      console.log("User signed out successfully");
-      router.replace("/");
+      // Go to root-level signout screen first; it then replaces to "/" so we land on landing page, not (tabs)/index.
+      setTimeout(() => {
+        router.replace("/signout");
+      }, 0);
     } catch (err) {
       console.error(JSON.stringify(err, null, 2));
     }

@@ -74,10 +74,9 @@ const MyStats = () => {
             data.message || `Failed to fetch clients (${response.status})`
           );
         }
-
+        console.log("Fetched clients data:", data);
         return data;
       } catch (error) {
-        console.error("Clients fetch error:", error);
         throw error;
       }
     },
@@ -118,14 +117,14 @@ const MyStats = () => {
         }
         console.log("Projects response:", data);
         if (!response.ok) {
-          console.error("Projects fetch failed:", response.status, data);
+          // console.error("Projects fetch failed:", response.status, data);
           throw new Error(
             data.message || `Failed to fetch projects (${response.status})`
           );
         }
         return data;
       } catch (error) {
-        console.error("Projects fetch error:", error);
+        // console.error("Projects fetch error:", error);
         throw error;
       }
     },
@@ -193,6 +192,7 @@ const MyStats = () => {
 
   // Error state
   const hasError = clientsError || projectsError;
+ 
 
   const handlePress = () => {
     if (dueGig) {
@@ -204,6 +204,8 @@ const MyStats = () => {
       });
     }
   };
+
+  const thisMonthEarnings = 1000;
 
   // Show loading while Clerk initializes
   if (!isLoaded) {
@@ -394,34 +396,15 @@ const MyStats = () => {
           <View className="bg-white w-full h-[48%] px-3 py-2 rounded-[10px]">
             <View className="flex-row justify-between">
               <Text className="font-semiBold text-primary text-[14px]">
-                Meetings
+                July's Earnings
               </Text>
-              {clientWithMeeting && (
-                <View className="flex-row justify-between">
-                  <View className="h-[21px] w-[21px] rounded-full bg-[#F4CE9B] justify-center items-center">
-                    <Text className="text-white font-semiBold text-[10px]">
-                      {getInitials(clientWithMeeting)}
-                    </Text>
-                  </View>
-                </View>
-              )}
             </View>
-            {clientWithMeeting ? (
-              <View>
-                <Text className="font-semiBold my-2 text-[12px]">
-                  Fintech UI website review
-                </Text>
-                <Text className="text-[12px] font-regular">
-                  2 Jan, 2023 5:30PM
-                </Text>
-              </View>
-            ) : (
-              <View className="flex-1 justify-center">
-                <Text className="font-semiBold text-[13px] text-gray-600 text-center">
-                  You have no scheduled meeting yet
-                </Text>
-              </View>
-            )}
+            <Text className="font-semiBold text-[16px] mt-2 text-primary text-center">
+              ${thisMonthEarnings}
+            </Text>
+            <Text className="font-regular text-[12px] mt-2 text-gray-600 text-center">
+              Earnings from July 1 to July 31
+            </Text>
           </View>
         </View>
       </View>

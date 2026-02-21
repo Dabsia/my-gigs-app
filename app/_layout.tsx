@@ -69,6 +69,7 @@ export default function RootLayout() {
               }}
             >
               <Stack.Screen name="index" />
+              <Stack.Screen name="signout" options={{ animation: "none" }} />
               <Stack.Screen name="onboarding/createprofile" />
               <Stack.Screen name="onboarding/createpayout" />
               <Stack.Screen name="onboarding/payoutsuccess" />

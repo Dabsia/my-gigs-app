@@ -8,9 +8,10 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { TAB_BAR_BASE_HEIGHT } from "@/utils/config";
 import axios from "axios";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
@@ -28,6 +29,7 @@ const GENERATE_COMMAND = "GENERATE_FILE_COMMAND:";
 
 export default function ai() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -720,7 +722,10 @@ export default function ai() {
         keyExtractor={(item, index) => `message-${index}-${item.timestamp}`}
         showsVerticalScrollIndicator={false}
         className="flex-1 px-4 pt-4"
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingBottom: 20 + TAB_BAR_BASE_HEIGHT + (insets.bottom ?? 0),
+        }}
         onContentSizeChange={() =>
           flatListRef.current?.scrollToEnd({ animated: true })
         }

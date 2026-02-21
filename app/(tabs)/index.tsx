@@ -2,13 +2,15 @@ import HomeHeader from "@/components/HomeHeader/HomeHeader";
 import LatestGigs from "@/components/LatestGigs/LatestGigs";
 import Layout from "@/components/Layout/Layout";
 import MyStats from "@/components/MyStats/MyStats";
-import { API_BASE_URL } from "@/utils/config";
+import { API_BASE_URL, TAB_BAR_BASE_HEIGHT } from "@/utils/config";
 import { useAuth } from "@clerk/clerk-expo";
 import { useQuery } from "@tanstack/react-query";
 import { ScrollView } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   const { getToken, isSignedIn, isLoaded } = useAuth();
+  const insets = useSafeAreaInsets();
 
   // React Query - only runs when Clerk is loaded AND user is signed in
   const { data } = useQuery({
@@ -44,9 +46,14 @@ export default function HomeScreen() {
     lastName: userData?.name?.split(" ").slice(1).join(" ") || "",
   };
 
+  const tabBarPadding = TAB_BAR_BASE_HEIGHT + (insets.bottom ?? 0);
+
   return (
     <Layout className="white">
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: tabBarPadding }}
+      >
         <HomeHeader userName={userName} />
         <MyStats />
         <LatestGigs />

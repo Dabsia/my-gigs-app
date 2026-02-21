@@ -32,6 +32,7 @@ interface ClientProjectsResponse {
     company: string;
     email: string;
     phone: string;
+    address: string;
   };
   stats: {
     total: number;
@@ -123,6 +124,7 @@ export default function ClientProfile() {
     });
 
     const data: ClientProjectsResponse = await response.json();
+    console.log("daygdsjh", data);
 
     if (!response.ok) {
       throw new Error(
@@ -137,8 +139,8 @@ export default function ClientProfile() {
     // Transform the client data from the response
     const client: Client = {
       id: data.client.id,
-      _id: data.client.id,
       name: data.client.name,
+      address: data.client.address,
       company: data.client.company || "",
       email: data.client.email || "",
       phone: data.client.phone || "",
@@ -244,6 +246,7 @@ export default function ClientProfile() {
         name: "Unknown Client",
         company: "Unknown Company",
         email: "",
+        address: "",
         phone: "",
         status: "active",
         hasOverdue: false,
@@ -287,15 +290,19 @@ export default function ClientProfile() {
       const remainingAmount =
         (project.totalAmount || 0) - (project.amountPaid || 0);
 
+      console.log("currrrent", currentClient);
+
       // Ensure client object exists in the format GigCard expects
       const clientObject = project.client || {
-        id: currentClient.id || currentClient._id,
+        id: currentClient.id,
         name: currentClient.name,
         email: currentClient.email,
         phone: currentClient.phone,
         company: currentClient.company,
-        address: (project as any).clientInfo?.address || "",
+        address: currentClient.address,
       };
+
+      console.log("skjds", clientObject);
 
       // Return the full project with all original data plus computed fields
       return {

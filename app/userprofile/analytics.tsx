@@ -1,19 +1,19 @@
-import React, { useState } from "react";
-import { View, Text, ScrollView, RefreshControl } from "react-native";
 import {
-  DollarSign,
-  Clock,
-  Users,
-  ArrowUpRight,
   ArrowDownRight,
+  ArrowUpRight,
   BriefcaseBusiness,
+  Clock,
+  DollarSign,
+  Users,
 } from "lucide-react-native";
-import { Svg, Circle, G, Text as SvgText } from "react-native-svg";
+import React, { useState } from "react";
+import { RefreshControl, ScrollView, Text, View } from "react-native";
+import { Circle, G, Svg, Text as SvgText } from "react-native-svg";
 
 // Layout & Custom Components
-import Layout from "@/components/Layout/Layout";
-import BackBtn from "@/components/BackBtn/BackBtn";
 import InteractiveAreaChart from "@/components/AnalyticsGraph";
+import BackBtn from "@/components/BackBtn/BackBtn";
+import Layout from "@/components/Layout/Layout";
 import { getTopRevenueInsight } from "@/helpers/higestMoneyEarnedCalc";
 
 // Mock data - Ensure these arrays match in length for the best UI
@@ -231,7 +231,7 @@ export default function AnalyticsScreen() {
             </Text>
             <View className="flex-row flex-wrap -mx-1">
               <StatCard
-                title="Revenue"
+                title="Total Revenue"
                 value={analyticsData.overview.revenue}
                 change={analyticsData.overview.revenueChange}
                 icon={DollarSign}

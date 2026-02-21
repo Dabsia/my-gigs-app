@@ -10,11 +10,11 @@ interface LayoutProps {
   statusBarColor?: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ 
-  children, 
-  className = '', 
+const Layout: React.FC<LayoutProps> = ({
+  children,
+  className = '',
   statusBarColor = '#061D3F',
-  backgroundColor = '#f6f6f1'
+  backgroundColor = '#f6f6f1',
 }) => {
   return (
     <View style={{ flex: 1, backgroundColor }}>

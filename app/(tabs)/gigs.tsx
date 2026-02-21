@@ -1,14 +1,17 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, ScrollView } from "react-native";
 import React, { useState } from "react";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import EyeIcon from "@/assets/icons/Eye";
 import UnionIcon from "@/assets/icons/Union";
 import RightArrowIcon from "@/assets/icons/RightArrow";
 import UserIcon from "@/assets/icons/User";
-import { useRouter } from "expo-router";
 import Layout from "@/components/Layout/Layout";
+import { TAB_BAR_BASE_HEIGHT } from "@/utils/config";
 
 const Gigs = () => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [isTrue, setIsTrue] = useState(false);
 
@@ -16,8 +19,14 @@ const Gigs = () => {
     setIsTrue(!isTrue);
   };
 
+  const tabBarPadding = TAB_BAR_BASE_HEIGHT + (insets.bottom ?? 0);
+
   return (
     <Layout>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: tabBarPadding }}
+      >
       <View className="pt-4">
         <Text className="font-semiBold  text-[#989BA6] text-[24px] ">
           Create Gig
@@ -69,6 +78,7 @@ const Gigs = () => {
           </Pressable> */}
         </View>
       </View>
+      </ScrollView>
     </Layout>
   );
 };

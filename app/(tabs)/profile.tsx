@@ -1,16 +1,16 @@
 import React from "react";
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   Text,
-  View,
+  View
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Avatar from "@/components/Avatar/Avatar";
 import Layout from "@/components/Layout/Layout";
 import Logout from "@/components/Logout/Logout";
-import { API_BASE_URL } from "@/utils/config";
+import { API_BASE_URL, TAB_BAR_BASE_HEIGHT } from "@/utils/config";
 import { useAuth } from "@clerk/clerk-expo";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -24,6 +24,7 @@ import {
 
 const Profile = () => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { getToken, isSignedIn, isLoaded } = useAuth();
 
   const { data, isLoading, error } = useQuery({
@@ -63,17 +64,7 @@ const Profile = () => {
   const name = userData?.name || "User";
   const profession = userData?.profession || "No profession set";
 
-  // Show loading state
-  if (isLoading) {
-    return (
-      <Layout>
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#0000ff" />
-          <Text className="mt-4 text-gray-600">Loading profile...</Text>
-        </View>
-      </Layout>
-    );
-  }
+ 
 
   // Show error state
   if (error) {
@@ -86,9 +77,14 @@ const Profile = () => {
     );
   }
 
+  const tabBarPadding = TAB_BAR_BASE_HEIGHT + (insets.bottom ?? 0);
+
   return (
     <Layout>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: tabBarPadding }}
+      >
         {/* Avatar + Name */}
         <View className="items-center mt-6">
           <Avatar

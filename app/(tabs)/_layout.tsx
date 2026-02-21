@@ -2,9 +2,11 @@ import GigsIcon from "@/assets/icons/GigsIcon";
 import HomeIcon from "@/assets/icons/Home";
 import SendIcon from "@/assets/icons/SendIcon";
 import UserIcon from "@/assets/icons/User";
+import { TAB_BAR_BASE_HEIGHT } from "@/utils/config";
 import { Tabs } from "expo-router";
 import React from "react";
 import { Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface TabIconInterface {
   icon: any;
@@ -29,20 +31,23 @@ const TabIcon: React.FC<TabIconInterface> = ({ icon, name, focused }) => {
 };
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  const bottomInset = insets.bottom ?? 0;
+  const tabBarTotalHeight = TAB_BAR_BASE_HEIGHT + bottomInset;
+
   return (
     <Tabs
       screenOptions={{
         tabBarShowLabel: false,
-        // tabBarActiveTintColor: "#6F2DA8",
-        // tabBarInactiveTintColor: "#cdcde0",
         headerShown: false,
         tabBarStyle: {
           backgroundColor: "#061D3F",
-          height: 80,
-          display: "flex",
+          height: tabBarTotalHeight,
           paddingTop: 23,
-          alignItems: "center", // Center items vertically
-          justifyContent: "center", // Center items horizontally
+          paddingBottom: bottomInset,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         },
       }}
     >

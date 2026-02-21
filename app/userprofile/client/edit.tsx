@@ -32,6 +32,8 @@ export default function EditClient() {
   // Parse and use the client data passed from the previous screen
   const clientInfo = client ? JSON.parse(client as string) : null;
 
+  console.log("clieent", client);
+
   // Populate form with client data only once on mount
   useEffect(() => {
     if (client) {

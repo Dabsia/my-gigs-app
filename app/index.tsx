@@ -11,12 +11,13 @@ const Index = () => {
   //   router.push("/auth/login");
   // };
 
-  const { isSignedIn } = useUser();
+  const { isSignedIn, isLoaded } = useUser();
   useEffect(() => {
-    if (isSignedIn) {
+    // Only send signed-in users to tabs. When coming from logout, isSignedIn becomes false so we stay on this landing page.
+    if (isLoaded && isSignedIn) {
       router.replace("/(tabs)");
     }
-  }, [isSignedIn]);
+  }, [isLoaded, isSignedIn]);
 
   return (
     <Layout>

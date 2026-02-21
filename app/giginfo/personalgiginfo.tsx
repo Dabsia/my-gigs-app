@@ -12,7 +12,7 @@ import { formatDate } from "@/helpers/formatDate";
 import { truncateText } from "@/utils/textLengthFormatter";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { File, Share2, Trash2, Video } from "lucide-react-native";
+import { File, Share2, Trash2 } from "lucide-react-native";
 import React, { useRef } from "react";
 import { Image, Pressable, ScrollView, Share, Text, View } from "react-native";
 
@@ -273,7 +273,7 @@ const personalgiginfo = () => {
                 </View>
               </Pressable>
 
-              <Pressable
+              {/* <Pressable
                 onPress={() => router.push("/giginfo/meetingscheduler")}
                 className="flex-row bg-white h-[90px] mb-4 rounded-[22px] p-3 items-center justify-between"
               >
@@ -294,7 +294,7 @@ const personalgiginfo = () => {
                     </Text>
                   </View>
                 </View>
-              </Pressable>
+              </Pressable> */}
               <Pressable
                 onPress={handleShareProject}
                 className="flex-row bg-white h-[70px] mb-4 rounded-[22px] p-3 items-center justify-between"

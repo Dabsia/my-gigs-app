@@ -171,6 +171,7 @@ export interface Project {
     name?: string;
     email?: string;
     phone?: string;
+    address?:string;
     company?: string;
   };
 }
@@ -194,6 +195,7 @@ export interface Client {
   company?: string;
   email?: string;
   phone?: string;
+  address?:string;
   status: string;
   hasOverdue: boolean;
   initials: string;
